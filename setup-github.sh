@@ -13,10 +13,10 @@
 set -e
 
 # ---- CAMBIA ESTO ANTES DE CORRERLO ----------------------------------
-USUARIO_GH="brayantrujillo"      # tu usuario de GitHub
-ANDRES="usuario-andres"
-JOHAN="usuario-johan"
-LUIS="usuario-luis"
+USUARIO_GH="brayantrujillodev"   # tu usuario de GitHub
+ANDRES="devbonill17"
+JOHAN="master2503"
+LUIS="Emerson062002"
 # ---------------------------------------------------------------------
 
 echo "==> 1. Inicializando el repositorio"
