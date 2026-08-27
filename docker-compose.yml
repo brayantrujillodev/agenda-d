@@ -1,0 +1,184 @@
+# =====================================================================
+# AGENDA-D · Infraestructura y servicios
+#
+# ESTADO ACTUAL
+#   Solo el perfil `infra` funciona hoy. Los servicios Java están
+#   definidos porque representan la infraestructura prevista, pero sus
+#   proyectos aún no existen: hasta que cada carpeta tenga su pom.xml y
+#   su Dockerfile, `--profile core` y `--profile full` fallarán en el build.
+#
+# PERFILES
+#   --profile infra  → postgres + kafka + consola     FUNCIONA HOY
+#   --profile core   → infra + agenda-service         requiere el proyecto
+#   --profile full   → todo                           requiere los cuatro
+#
+# Alguien del equipo tiene 8 GB de RAM: usen el perfil más pequeño que
+# les sirva. Por eso hay límites de memoria en cada contenedor.
+# =====================================================================
+
+name: agenda-d
+
+services:
+
+  # -------------------------------------------------------------------
+  # INFRAESTRUCTURA · lista para usarse
+  # -------------------------------------------------------------------
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: agd-postgres
+    profiles: [infra, core, full]
+    environment:
+      POSTGRES_DB: agendad
+      POSTGRES_USER: agendad
+      POSTGRES_PASSWORD: agendad
+    ports:
+      - "5432:5432"          # para conectar DBeaver o psql desde el equipo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # La migración se aplica sola la primera vez que arranca el volumen.
+      # Cuando exista agenda-service, Flyway toma el relevo.
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agendad -d agendad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: agd-kafka
+    profiles: [infra, core, full]
+    environment:
+      # Modo KRaft: sin ZooKeeper, un contenedor menos y menos RAM
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "controller,broker"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_NUM_PARTITIONS: "3"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "29092:29092"        # desde el equipo: localhost:29092
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 1g
+    networks: [agenda-net]
+
+  # Consola para ver tópicos, particiones y retrasos de consumo.
+  # Útil para la sustentación.
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: agd-kafka-ui
+    profiles: [infra, full]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: agenda-d
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    ports:
+      - "8090:8080"
+    depends_on:
+      kafka: { condition: service_healthy }
+    mem_limit: 384m
+    networks: [agenda-net]
+
+  # -------------------------------------------------------------------
+  # SERVICIOS · definidos, aún sin proyecto
+  #
+  # Cada uno se activa cuando exista su carpeta con pom.xml y Dockerfile.
+  # Orden de construcción: agenda → notificaciones → gateway → analitica.
+  # -------------------------------------------------------------------
+
+  agenda-service:
+    build: ./agenda-service
+    container_name: agd-agenda
+    profiles: [core, full]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
+      SPRING_DATASOURCE_USERNAME: agendad
+      SPRING_DATASOURCE_PASSWORD: agendad
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8081:8081"          # la ruta pública del cliente entra por aquí
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka:    { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  notificaciones-service:
+    build: ./notificaciones-service
+    container_name: agd-notificaciones
+    profiles: [full]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
+      SPRING_DATASOURCE_USERNAME: agendad
+      SPRING_DATASOURCE_PASSWORD: agendad
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # REGISTRO = guarda el mensaje en BD en vez de enviarlo. Sin costo.
+      AGENDAD_CANAL_POR_DEFECTO: REGISTRO
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka:    { condition: service_healthy }
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  gateway-graphql:
+    build: ./gateway-graphql
+    container_name: agd-gateway
+    profiles: [full]
+    environment:
+      AGENDAD_AGENDA_URL: http://agenda-service:8081
+      AGENDAD_ANALITICA_URL: http://analitica-service:8083
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8080:8080"          # el panel de recepción consume esto
+    depends_on:
+      agenda-service: { condition: service_healthy }
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  analitica-service:
+    build: ./analitica-service
+    container_name: agd-analitica
+    profiles: [full]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
+      SPRING_DATASOURCE_USERNAME: agendad
+      SPRING_DATASOURCE_PASSWORD: agendad
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka:    { condition: service_healthy }
+    mem_limit: 512m
+    networks: [agenda-net]
+
+volumes:
+  pgdata:
+
+networks:
+  agenda-net:
+    driver: bridge

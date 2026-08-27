@@ -1,0 +1,577 @@
+openapi: 3.0.3
+
+info:
+  title: AGENDA-D · agenda-service
+  version: 1.0.0
+  description: |
+    Agendamiento de citas para negocios de servicios.
+    Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
+
+    **Contexto de negocio (no hay autenticación en este alcance):**
+    - Ruta pública: el negocio se resuelve por el `slug` de la URL.
+    - Ruta administrativa: el negocio viaja en la cabecera `X-Negocio-Id`.
+
+servers:
+  - url: http://localhost:8080
+    description: Local vía Docker Compose
+
+tags:
+  - name: Público
+    description: Lo que usa el cliente final, sin cuenta
+  - name: Gestión
+    description: El cliente opera su propia cita con un token
+  - name: Agenda
+    description: Jornada del profesional y registro de asistencia
+  - name: Métricas
+    description: Indicadores del negocio
+
+paths:
+
+  # ---------------------------------------------------------------
+  # 1. GET  /v1/publico/{slug}/servicios
+  # ---------------------------------------------------------------
+  /v1/publico/{slug}/servicios:
+    get:
+      tags: [Público]
+      summary: Servicios que ofrece el negocio
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: Lista de servicios activos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Servicio'
+              example:
+                - id: 22222222-2222-2222-2222-222222222222
+                  nombre: Corte de cabello
+                  duracionMin: 60
+                  precio: 25000
+                - id: 22222222-2222-2222-2222-222222222223
+                  nombre: Barba
+                  duracionMin: 30
+                  precio: 15000
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 2. GET  /v1/publico/{slug}/disponibilidad
+  # ---------------------------------------------------------------
+  /v1/publico/{slug}/disponibilidad:
+    get:
+      tags: [Público]
+      summary: Cupos libres para un servicio en una fecha
+      description: |
+        Cruza el horario de atención del profesional con sus bloqueos y sus
+        citas ya tomadas. Devuelve solo franjas horarias: nunca datos de
+        otros clientes.
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+        - name: servicioId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fecha
+          in: query
+          required: true
+          description: Fecha en hora local del negocio
+          schema:
+            type: string
+            format: date
+          example: '2026-08-20'
+        - name: profesionalId
+          in: query
+          required: false
+          description: Si se omite, devuelve cupos de todos los profesionales
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cupos disponibles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fecha:
+                    type: string
+                    format: date
+                  zonaHoraria:
+                    type: string
+                  cupos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Cupo'
+              example:
+                fecha: '2026-08-20'
+                zonaHoraria: America/Bogota
+                cupos:
+                  - inicio: '2026-08-20T13:00:00Z'
+                    fin: '2026-08-20T14:00:00Z'
+                    horaLocal: '08:00'
+                    profesionalId: 33333333-3333-3333-3333-333333333333
+                    profesionalNombre: Laura
+                  - inicio: '2026-08-20T14:00:00Z'
+                    fin: '2026-08-20T15:00:00Z'
+                    horaLocal: '09:00'
+                    profesionalId: 33333333-3333-3333-3333-333333333333
+                    profesionalNombre: Laura
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 3. POST /v1/publico/{slug}/citas   ← operación crítica
+  # ---------------------------------------------------------------
+  /v1/publico/{slug}/citas:
+    post:
+      tags: [Público]
+      summary: Reservar una cita
+      description: |
+        **Operación crítica del sistema.**
+
+        La ausencia de solapamiento NO se valida en el código: se delega a la
+        restricción `EXCLUDE` de PostgreSQL sobre rangos temporales. Si el
+        motor rechaza la escritura, se responde 409 con los cupos más cercanos.
+
+        Reenviar la misma `Idempotency-Key` devuelve la cita original en lugar
+        de crear una segunda.
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: UUID generado por el cliente antes de enviar
+          schema:
+            type: string
+          example: 7d9f2a10-5c31-4e88-b0aa-93c2f1e64d5b
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservaRequest'
+            example:
+              servicioId: 22222222-2222-2222-2222-222222222222
+              profesionalId: 33333333-3333-3333-3333-333333333333
+              inicio: '2026-08-20T13:00:00Z'
+              clienteNombre: Juan Pérez
+              clienteCelular: '3001234567'
+      responses:
+        '201':
+          description: Cita creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitaCreada'
+              example:
+                id: 44444444-4444-4444-4444-444444444444
+                inicio: '2026-08-20T13:00:00Z'
+                fin: '2026-08-20T14:00:00Z'
+                horaLocal: '08:00'
+                servicioNombre: Corte de cabello
+                profesionalNombre: Laura
+                estado: CONFIRMADA
+                enlaceGestion: http://localhost:8080/v1/gestion/9f3c7a2b5e8d1064
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '409':
+          description: El cupo se acaba de ocupar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictoCupo'
+              example:
+                codigo: CUPO_OCUPADO
+                mensaje: Ese cupo se acaba de ocupar. Estos son los más cercanos.
+                alternativas:
+                  - inicio: '2026-08-20T14:00:00Z'
+                    fin: '2026-08-20T15:00:00Z'
+                    horaLocal: '09:00'
+                    profesionalId: 33333333-3333-3333-3333-333333333333
+                    profesionalNombre: Laura
+
+  # ---------------------------------------------------------------
+  # 4 y 5. GET y DELETE /v1/gestion/{token}
+  # ---------------------------------------------------------------
+  /v1/gestion/{token}:
+    get:
+      tags: [Gestión]
+      summary: Consultar la cita asociada al token
+      description: |
+        El token es aleatorio y no enumerable. Da acceso a UNA sola cita: no
+        expone la agenda del negocio ni datos de terceros. El celular se
+        devuelve enmascarado.
+      parameters:
+        - $ref: '#/components/parameters/TokenGestion'
+      responses:
+        '200':
+          description: Detalle de la cita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitaDetalle'
+              example:
+                id: 44444444-4444-4444-4444-444444444444
+                inicio: '2026-08-20T13:00:00Z'
+                fin: '2026-08-20T14:00:00Z'
+                horaLocal: '08:00'
+                servicioNombre: Corte de cabello
+                profesionalNombre: Laura
+                clienteNombre: Juan Pérez
+                clienteCelular: 300****567
+                estado: CONFIRMADA
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+    delete:
+      tags: [Gestión]
+      summary: Cancelar la cita
+      description: Libera el cupo y publica el evento `citas.canceladas`.
+      parameters:
+        - $ref: '#/components/parameters/TokenGestion'
+        - name: confirmar
+          in: query
+          required: true
+          description: Debe ser true. Evita cancelaciones por un clic accidental.
+          schema:
+            type: boolean
+          example: true
+      responses:
+        '204':
+          description: Cita cancelada
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 6. GET /v1/agenda/{profesionalId}
+  # ---------------------------------------------------------------
+  /v1/agenda/{profesionalId}:
+    get:
+      tags: [Agenda]
+      summary: Jornada del profesional para una fecha
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - name: profesionalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fecha
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: '2026-08-20'
+      responses:
+        '200':
+          description: Citas del día, ordenadas por hora
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CitaDetalle'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 7. PATCH /v1/citas/{id}/estado
+  # ---------------------------------------------------------------
+  /v1/citas/{id}/estado:
+    patch:
+      tags: [Agenda]
+      summary: Registrar el resultado de la cita
+      description: |
+        Publica el evento `citas.estado`, que alimenta la tasa de inasistencia.
+        No se permite sobre una cita cancelada.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado:
+                  type: string
+                  enum: [ATENDIDA, NO_ASISTIO]
+            example:
+              estado: NO_ASISTIO
+      responses:
+        '204':
+          description: Estado registrado
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 8. GET /v1/metricas
+  # ---------------------------------------------------------------
+  /v1/metricas:
+    get:
+      tags: [Métricas]
+      summary: Indicadores del negocio en un periodo
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - name: desde
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: hasta
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Métricas del periodo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metricas'
+              example:
+                desde: '2026-08-01'
+                hasta: '2026-08-31'
+                totalCitas: 184
+                atendidas: 160
+                noAsistio: 18
+                canceladas: 6
+                ocupacion: 72.5
+                tasaInasistencia: 9.8
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+
+# ===================================================================
+
+components:
+
+  parameters:
+
+    Slug:
+      name: slug
+      in: path
+      required: true
+      description: Identificador público del negocio, tomado de su enlace
+      schema:
+        type: string
+      example: barberia-el-corte
+
+    NegocioId:
+      name: X-Negocio-Id
+      in: header
+      required: true
+      description: |
+        Identificador del negocio. Mientras no exista autenticación lo envía
+        el frontend; en producción lo llenaría el componente de login a partir
+        del token del usuario.
+      schema:
+        type: string
+        format: uuid
+      example: 11111111-1111-1111-1111-111111111111
+
+    TokenGestion:
+      name: token
+      in: path
+      required: true
+      description: Token aleatorio recibido en el mensaje de confirmación
+      schema:
+        type: string
+
+  schemas:
+
+    Servicio:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        duracionMin:
+          type: integer
+        precio:
+          type: number
+
+    Cupo:
+      type: object
+      properties:
+        inicio:
+          type: string
+          format: date-time
+          description: En UTC
+        fin:
+          type: string
+          format: date-time
+          description: En UTC
+        horaLocal:
+          type: string
+          description: Para mostrar al usuario
+        profesionalId:
+          type: string
+          format: uuid
+        profesionalNombre:
+          type: string
+
+    ReservaRequest:
+      type: object
+      required: [servicioId, profesionalId, inicio, clienteNombre, clienteCelular]
+      properties:
+        servicioId:
+          type: string
+          format: uuid
+        profesionalId:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+          description: En UTC. El fin se calcula con la duración del servicio.
+        clienteNombre:
+          type: string
+          minLength: 2
+          maxLength: 120
+        clienteCelular:
+          type: string
+          pattern: '^[0-9]{10}$'
+
+    CitaCreada:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+        fin:
+          type: string
+          format: date-time
+        horaLocal:
+          type: string
+        servicioNombre:
+          type: string
+        profesionalNombre:
+          type: string
+        estado:
+          type: string
+        enlaceGestion:
+          type: string
+          description: URL para consultar, cancelar o reprogramar
+
+    CitaDetalle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+        fin:
+          type: string
+          format: date-time
+        horaLocal:
+          type: string
+        servicioNombre:
+          type: string
+        profesionalNombre:
+          type: string
+        clienteNombre:
+          type: string
+        clienteCelular:
+          type: string
+          description: Enmascarado en la ruta de gestión
+        estado:
+          type: string
+          enum: [CONFIRMADA, CANCELADA, ATENDIDA, NO_ASISTIO]
+
+    Metricas:
+      type: object
+      properties:
+        desde:
+          type: string
+          format: date
+        hasta:
+          type: string
+          format: date
+        totalCitas:
+          type: integer
+        atendidas:
+          type: integer
+        noAsistio:
+          type: integer
+        canceladas:
+          type: integer
+        ocupacion:
+          type: number
+          description: Porcentaje 0-100
+        tasaInasistencia:
+          type: number
+          description: Porcentaje 0-100
+
+    ConflictoCupo:
+      type: object
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        alternativas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cupo'
+
+    Error:
+      type: object
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+          description: En español claro. Nunca un stacktrace.
+
+  responses:
+
+    PeticionInvalida:
+      description: Solicitud inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: DATOS_INVALIDOS
+            mensaje: El número de celular debe tener 10 dígitos.
+
+    NoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: NO_ENCONTRADO
+            mensaje: No encontramos esa cita. Es posible que el enlace haya vencido.

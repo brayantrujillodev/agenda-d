@@ -1,0 +1,208 @@
+# =====================================================================
+# AGENDA-D · Esquema GraphQL del gateway
+# Ubicación: gateway-graphql/src/main/resources/graphql/schema.graphqls
+#
+# QUÉ HACE EL GATEWAY
+#   Compone en una sola consulta datos que viven en dos servicios
+#   distintos (agenda-service y analitica-service).
+#
+# QUÉ NO HACE  ← la pregunta de cierre de la clase 3
+#   No tiene base de datos. No tiene lógica de negocio. No valida reglas
+#   del dominio. No publica eventos. Si un resolver necesitara consultar
+#   una tabla, la responsabilidad está mal ubicada.
+#
+# POR QUÉ LA RUTA PÚBLICA NO ESTÁ AQUÍ
+#   Consultar cupos y reservar son las operaciones más frecuentes, las
+#   usan personas sin cuenta y no deben depender de un componente pensado
+#   para el panel administrativo. Van directo a agenda-service por REST.
+#   GraphQL sirve al panel de recepción, que es donde una sola pantalla
+#   necesita datos de varios servicios a la vez.
+# =====================================================================
+
+scalar Instant   # ISO-8601 en UTC. Ej: "2026-08-20T13:00:00Z"
+scalar Date      # Fecha local del negocio. Ej: "2026-08-20"
+scalar Decimal
+
+# ---------------------------------------------------------------------
+# TIPOS
+# ---------------------------------------------------------------------
+
+type Negocio {
+  id: ID!
+  nombre: String!
+  slugPublico: String!
+  zonaHoraria: String!
+  servicios: [Servicio!]!
+  profesionales: [Profesional!]!
+}
+
+type Servicio {
+  id: ID!
+  nombre: String!
+  duracionMin: Int!
+  precio: Decimal!
+  activo: Boolean!
+}
+
+type Profesional {
+  id: ID!
+  nombre: String!
+  activo: Boolean!
+  servicios: [Servicio!]!
+  horarios: [HorarioAtencion!]!
+  "Citas de este profesional en la fecha dada. Si se omite, hoy."
+  agenda(fecha: Date): [Cita!]!
+}
+
+type HorarioAtencion {
+  diaSemana: Int!      # 1 = lunes ... 7 = domingo (ISO-8601)
+  horaInicio: String!  # hora local del negocio, "08:00"
+  horaFin: String!     # "18:00"
+}
+
+type Bloqueo {
+  id: ID!
+  inicio: Instant!
+  fin: Instant!
+  motivo: String
+}
+
+type Cita {
+  id: ID!
+  inicio: Instant!
+  fin: Instant!
+  "Hora en la zona del negocio, lista para mostrar. Ej: 08:00"
+  horaLocal: String!
+  servicio: Servicio!
+  profesional: Profesional!
+  clienteNombre: String!
+  "Enmascarado. Ej: 300****567"
+  clienteCelular: String!
+  estado: EstadoCita!
+}
+
+enum EstadoCita {
+  CONFIRMADA
+  CANCELADA
+  ATENDIDA
+  NO_ASISTIO
+}
+
+type Metricas {
+  desde: Date!
+  hasta: Date!
+  totalCitas: Int!
+  atendidas: Int!
+  noAsistio: Int!
+  canceladas: Int!
+  "Porcentaje 0–100. Minutos ocupados sobre minutos disponibles."
+  ocupacion: Float!
+  "Porcentaje 0–100. El indicador que mide si el sistema sirvió."
+  tasaInasistencia: Float!
+  topServicios: [ConteoServicio!]!
+}
+
+type ConteoServicio {
+  servicio: Servicio!
+  cantidad: Int!
+}
+
+# ---------------------------------------------------------------------
+# EL TIPO QUE JUSTIFICA GRAPHQL
+#
+# El panel de recepción necesita, al abrirse: la agenda del día, la
+# configuración del negocio y las métricas del mes. Con REST puro son
+# 3 o 4 peticiones desde un celular con mala señal. Aquí es una sola.
+#
+# Los datos vienen de DOS servicios distintos: agenda y analitica.
+# Componerlos es exactamente para lo que existe el gateway.
+# ---------------------------------------------------------------------
+type PanelRecepcion {
+  fecha: Date!
+  negocio: Negocio!
+  citasDelDia: [Cita!]!
+  metricasDelMes: Metricas!
+}
+
+# ---------------------------------------------------------------------
+# CONSULTAS
+# ---------------------------------------------------------------------
+
+type Query {
+  """
+  Pantalla completa del panel en una sola consulta.
+  Es la razón de existir del gateway.
+  """
+  panelRecepcion(fecha: Date): PanelRecepcion!
+
+  "Configuración del negocio en contexto (cabecera X-Negocio-Id)."
+  negocio: Negocio!
+
+  "Agenda de un profesional para una fecha."
+  agenda(profesionalId: ID!, fecha: Date!): [Cita!]!
+
+  "Indicadores del periodo. Resuelve contra analitica-service."
+  metricas(desde: Date!, hasta: Date!): Metricas!
+
+  "Bloqueos vigentes de un profesional."
+  bloqueos(profesionalId: ID!): [Bloqueo!]!
+}
+
+# ---------------------------------------------------------------------
+# MUTACIONES
+#
+# Solo lo que hace el personal del negocio desde el panel.
+# Reservar NO está aquí: esa la hace el cliente final por REST público.
+# ---------------------------------------------------------------------
+
+input ServicioInput {
+  nombre: String!
+  duracionMin: Int!
+  precio: Decimal!
+}
+
+input ProfesionalInput {
+  nombre: String!
+  serviciosIds: [ID!]!
+}
+
+input HorarioInput {
+  diaSemana: Int!
+  horaInicio: String!
+  horaFin: String!
+}
+
+input BloqueoInput {
+  profesionalId: ID!
+  inicio: Instant!
+  fin: Instant!
+  motivo: String
+}
+
+type Mutation {
+  crearServicio(entrada: ServicioInput!): Servicio!
+  actualizarServicio(id: ID!, entrada: ServicioInput!): Servicio!
+  desactivarServicio(id: ID!): Boolean!
+
+  crearProfesional(entrada: ProfesionalInput!): Profesional!
+  definirHorario(profesionalId: ID!, horarios: [HorarioInput!]!): Profesional!
+
+  """
+  Bloquea un rango del profesional (vacaciones, incapacidad, festivo).
+  Falla si hay citas confirmadas dentro del rango: el sistema no
+  desagenda clientes por su cuenta.
+  """
+  crearBloqueo(entrada: BloqueoInput!): Bloqueo!
+
+  """
+  Registra el resultado de la cita. Publica citas.estado, que alimenta
+  la tasa de inasistencia. Solo ATENDIDA o NO_ASISTIO.
+  """
+  registrarAsistencia(citaId: ID!, estado: EstadoCita!): Cita!
+
+  """
+  Cancela una cita desde el panel. Libera el cupo y publica
+  citas.canceladas, que dispara el aviso al cliente.
+  """
+  cancelarCita(citaId: ID!, motivo: String): Cita!
+}
