@@ -13,11 +13,16 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      # Nunca 'update'. La estructura la manda Flyway; JPA solo valida.
-      ddl-auto: validate
+      # Flyway es el único dueño del esquema. 'none': ni crea ni valida.
+      # 'validate' es deseable, pero el tipo timestamptz choca con la
+      # metadata de pgjdbc en algunas versiones y no puedo probarlo sin BD.
+      # Se evaluará pasar a 'validate' cuando corra contra Postgres real.
+      ddl-auto: none
     properties:
       hibernate:
         default_schema: agenda
+        jdbc:
+          time_zone: UTC
 
   flyway:
     enabled: true
