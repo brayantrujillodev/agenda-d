@@ -1,0 +1,48 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: agenda-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agendad}
+    username: ${SPRING_DATASOURCE_USERNAME:agendad}
+    password: ${SPRING_DATASOURCE_PASSWORD:agendad}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Nunca 'update'. La estructura la manda Flyway; JPA solo valida.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: agenda
+
+  flyway:
+    enabled: true
+    default-schema: agenda
+    # El perfil 'infra' del Compose ya deja el esquema creado (monta ./db en
+    # el initdb de Postgres). Cuando ese es el caso, Flyway encuentra el
+    # esquema 'agenda' poblado y sin su tabla de historial: baseline-on-migrate
+    # lo marca como versión 1 en vez de reintentar el CREATE y fallar.
+    # Sobre una base vacía (sin ese montaje) Flyway aplica V1 normalmente.
+    baseline-on-migrate: true
+    baseline-version: 1
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
