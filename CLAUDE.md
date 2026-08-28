@@ -24,11 +24,16 @@ agenda-d/
 ├─ gateway-graphql/         Compone la pantalla del panel en una consulta.
 ├─ web/                     PWA: reserva pública + panel de recepción.
 └─ docs/
-   ├─ openapi/agenda-service.yaml    ← contrato, léelo antes de tocar la API
-   └─ eventos/CONTRATO-EVENTOS.md    ← contrato de eventos
+   ├─ openapi/agenda-service.yaml    ← contrato REST, léelo antes de tocar la API
+   ├─ graphql/schema.graphqls        ← contrato GraphQL
+   ├─ eventos/CONTRATO-EVENTOS.md    ← contrato de eventos
+   ├─ CONSTRUCCION.md                ← pasos del flujo mínimo
+   ├─ TAREAS.md                      ← backlog
+   └─ EQUIPO.md                      ← quién lidera cada servicio
 ```
 
 Cada servicio tiene su propio `pom.xml`. No hay proyecto padre.
+Reparto y responsabilidades: [`docs/EQUIPO.md`](docs/EQUIPO.md).
 
 ---
 

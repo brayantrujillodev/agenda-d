@@ -21,21 +21,30 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 1 en curso.** Hoy funciona la infraestructura; los servicios Java
-todavía no tienen proyecto, así que sus carpetas están vacías y no se pueden
-construir. El Compose los deja definidos porque representan la infraestructura
-prevista, pero solo el perfil `infra` levanta sin errores.
+**Fase 1 en curso.** Hoy funciona la infraestructura y los contratos están
+versionados en el repo. `agenda-service` ya tiene proyecto y se construye por
+partes; los demás servicios aún no tienen proyecto. El Compose deja todo
+definido, pero solo el perfil `infra` levanta sin errores.
 
 | Componente | Estado |
 |---|---|
 | PostgreSQL con el esquema y datos de prueba | ✅ funciona |
 | Kafka en KRaft y su consola | ✅ funciona |
-| Contratos OpenAPI, GraphQL y de eventos | ✅ acordados |
-| `agenda-service` | ⬜ por construir |
+| Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
+| Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
+| `agenda-service` | 🔶 en curso — [PR #6](../../pull/6) esqueleto, [PR #7](../../pull/7) entidades + disponibilidad (en revisión) |
 | `notificaciones-service` | ⬜ por construir |
 | `gateway-graphql` | ⬜ por construir |
 | `analitica-service` | ⬜ por construir |
 | PWA de reserva | ⬜ por construir |
+
+> **Avance · 2026-08-28.** Repo publicado con `.gitignore`, licencia MIT,
+> contratos, migración y `docker-compose`. `agenda-service` arrancado en dos
+> PRs apilados: #6 (esqueleto Spring Boot 3.3 que arranca y aplica la
+> migración) y #7 (entidades del esquema `agenda` + `GET /v1/publico/{slug}/servicios`
+> y `GET /v1/publico/{slug}/disponibilidad`). Ningún PR mergeado todavía y el
+> `docker compose --profile core` aún no se ha verificado de punta a punta.
+> Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
 
@@ -153,11 +162,11 @@ correctas pero van después. El plan está ordenado según eso.
 Capacidad real: ~20 horas semanales entre los cuatro.
 
 ### Fase 1 · Semanas 1–5 · Cimientos
-- [ ] Contratos OpenAPI y GraphQL revisados y aprobados por todos
-- [ ] Migración Flyway con el `EXCLUDE` corriendo
-- [ ] Contrato de eventos acordado
-- [ ] `docker compose --profile core up` levanta agenda-service con `/actuator/health`
-- [ ] `agenda-service` consulta cupos y reserva contra la BD real
+- [x] Contratos OpenAPI, GraphQL y de eventos en el repo (`docs/`)
+- [x] Migración con el `EXCLUDE` en el repo (`db/V1__esquema_inicial.sql`)
+- [ ] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service` → PR [#6](../../pull/6)
+- [ ] `docker compose --profile core up` levanta agenda-service con `/actuator/health` → PR [#6](../../pull/6)
+- [ ] `agenda-service` consulta cupos → PR [#7](../../pull/7) · reserva contra la BD real → rama 3 (pendiente)
 
 ### Fase 2 · Semanas 6–10 · Flujo mínimo completo
 **El hito del semestre.** Al cerrarlo, el sistema recorre el circuito entero.
