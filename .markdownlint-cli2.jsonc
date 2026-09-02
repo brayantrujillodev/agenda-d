@@ -1,0 +1,35 @@
+// Configuración de markdownlint-cli2 para AGENDA-D.
+// Se ejecuta en CI (.github/workflows/lint.yml) y en local con:
+//   npx markdownlint-cli2 "**/*.md"
+{
+  "config": {
+    "default": true,
+
+    // La documentación está redactada a mano en español; el ancho de línea
+    // es una decisión editorial, no un error.
+    "MD013": false,
+
+    // Permitimos HTML embebido puntual dentro del Markdown.
+    "MD033": false,
+
+    // Líneas en negrita como la firma del equipo no son títulos.
+    "MD036": false,
+
+    // Estilo de separadores de tabla: no forzamos espaciado de pipes.
+    "MD060": false,
+
+    // Subtítulos repetidos ("Objetivo", "Hecho cuando…") son válidos
+    // mientras estén en secciones distintas.
+    "MD024": { "siblings_only": true }
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "**/node_modules/**",
+    "**/target/**",
+    // Fichero de instrucciones para agentes: usa cabeceras de nivel 1 como
+    // banners de sección a propósito.
+    "CLAUDE.md",
+    // Plantillas de GitHub: no son documentos y no empiezan por un título.
+    ".github/**"
+  ]
+}
