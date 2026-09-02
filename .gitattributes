@@ -1,0 +1,11 @@
+# Normaliza los finales de línea: LF en el repo, siempre.
+# Evita que Windows introduzca CRLF y dispare avisos de los linters.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.jar binary

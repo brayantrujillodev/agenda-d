@@ -82,13 +82,14 @@ medida que existan los proyectos con su `pom.xml` y su `Dockerfile`.
 |---|---|---|
 | PostgreSQL | localhost:5432 · `agendad`/`agendad` | activo |
 | Kafka desde el equipo | localhost:29092 | activo |
-| Consola de Kafka | http://localhost:8090 | activo |
-| agenda-service | http://localhost:8081 | por construir |
-| gateway GraphQL | http://localhost:8080/graphiql | por construir |
+| Consola de Kafka | <http://localhost:8090> | activo |
+| agenda-service | <http://localhost:8081> | por construir |
+| gateway GraphQL | <http://localhost:8080/graphiql> | por construir |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
 
 Para bajar todo y empezar de cero:
+
 ```bash
 docker compose --profile full down -v
 ```
@@ -97,7 +98,7 @@ docker compose --profile full down -v
 
 ## Estructura
 
-```
+```text
 agenda-d/
 ├─ docker-compose.yml
 ├─ agenda-service/          Dominio: citas, cupos, configuración. Productor.
@@ -162,6 +163,7 @@ correctas pero van después. El plan está ordenado según eso.
 Capacidad real: ~20 horas semanales entre los cuatro.
 
 ### Fase 1 · Semanas 1–5 · Cimientos
+
 - [x] Contratos OpenAPI, GraphQL y de eventos en el repo (`docs/`)
 - [x] Migración con el `EXCLUDE` en el repo (`db/V1__esquema_inicial.sql`)
 - [ ] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service` → PR [#6](../../pull/6)
@@ -169,7 +171,9 @@ Capacidad real: ~20 horas semanales entre los cuatro.
 - [ ] `agenda-service` consulta cupos → PR [#7](../../pull/7) · reserva contra la BD real → rama 3 (pendiente)
 
 ### Fase 2 · Semanas 6–10 · Flujo mínimo completo
+
 **El hito del semestre.** Al cerrarlo, el sistema recorre el circuito entero.
+
 - [ ] Outbox publicando `citas.reservadas`
 - [ ] `notificaciones-service` consumiendo y guardando el mensaje
 - [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion`
@@ -178,6 +182,7 @@ Capacidad real: ~20 horas semanales entre los cuatro.
 Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
 
 ### Fase 3 · Semanas 11–15 · Robustez
+
 - [ ] DLQ con reintentos y espera creciente
 - [ ] Idempotencia verificada
 - [ ] Testcontainers con la prueba de concurrencia (100 hilos)
@@ -186,6 +191,7 @@ Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
 - [ ] Prueba de separación entre negocios
 
 ### Semana 15
+
 Ensayar la sustentación. Los cuatro, todo el flujo.
 
 ---
