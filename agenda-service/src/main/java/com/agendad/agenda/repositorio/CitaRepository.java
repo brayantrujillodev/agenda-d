@@ -5,12 +5,19 @@ import com.agendad.agenda.dominio.EstadoCita;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CitaRepository extends JpaRepository<Cita, UUID> {
+
+    /**
+     * Reserva ya creada con esa {@code Idempotency-Key}. Reenviar la misma
+     * petición devuelve esta cita en vez de crear otra (RNF-05).
+     */
+    Optional<Cita> findByNegocioIdAndIdempotencyKey(UUID negocioId, String idempotencyKey);
 
     /**
      * Citas no canceladas de esos profesionales que se cruzan con la ventana

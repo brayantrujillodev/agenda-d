@@ -37,6 +37,18 @@ spring:
 
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # El relay publica una a una y espera el ack: no perder eventos pesa
+      # más que la latencia. La idempotencia evita duplicados si reintenta.
+      acks: all
+      properties:
+        enable.idempotence: true
+
+  jackson:
+    # Las respuestas del contrato no muestran campos nulos.
+    default-property-inclusion: non_null
 
 management:
   endpoints:
@@ -51,3 +63,11 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+agendad:
+  gestion:
+    # Base para armar el enlace de gestión que se devuelve al reservar.
+    base-url: ${AGENDAD_GESTION_BASE_URL:http://localhost:8081}
+  outbox:
+    # Cada cuánto el relay busca eventos pendientes y los publica.
+    intervalo-ms: ${AGENDAD_OUTBOX_INTERVALO_MS:2000}

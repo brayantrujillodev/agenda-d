@@ -59,6 +59,29 @@ public class Cita {
     protected Cita() {
     }
 
+    /**
+     * Crea una cita nueva en estado {@code CONFIRMADA}. El {@code fin} lo
+     * calcula el caso de uso con la duración del servicio. No comprueba
+     * solapamiento: eso lo arbitra la restricción {@code cita_sin_solape}
+     * de PostgreSQL cuando se persiste.
+     */
+    public Cita(UUID negocioId, UUID servicioId, UUID profesionalId,
+                Instant inicio, Instant fin, String clienteNombre,
+                String clienteCelular, String idempotencyKey) {
+        this.negocioId = negocioId;
+        this.servicioId = servicioId;
+        this.profesionalId = profesionalId;
+        this.inicio = inicio;
+        this.fin = fin;
+        this.clienteNombre = clienteNombre;
+        this.clienteCelular = clienteCelular;
+        this.idempotencyKey = idempotencyKey;
+        this.estado = EstadoCita.CONFIRMADA;
+        Instant ahora = Instant.now();
+        this.creadaEn = ahora;
+        this.actualizadaEn = ahora;
+    }
+
     public UUID getId() {
         return id;
     }
