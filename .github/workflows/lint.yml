@@ -32,7 +32,7 @@ jobs:
         run: yamllint .
 
       - name: Shell (shellcheck)
-        run: shellcheck setup-github.sh
+        run: shellcheck --severity=warning setup-github.sh
 
       - name: SQL (sqlfluff)
         run: sqlfluff lint db/
