@@ -36,9 +36,11 @@ Mientras `agenda-service` no exista, `config.js` trae `useMock: true` y
 | `GET` / `DELETE /v1/gestion/{token}` | lee y cancela la cita creada (persiste en `localStorage`) |
 
 - El estado del mock vive en `localStorage`. En la consola: `mockReset()` lo borra.
-- **Probar el `409`:** cada día tiene 2 cupos que se ven libres pero rebotan al
-  reservar (simulan "se acaba de ocupar entre que lo viste y confirmaste").
-  Prueba varias horas hasta que uno dé el aviso con alternativas.
+- **Probar el `409`:** cada día tiene 2 cupos por profesional que se muestran
+  libres pero rebotan al confirmar (simulan "se ocupó entre que lo viste y
+  confirmaste"). Tras rebotar quedan tomados de verdad y desaparecen de la
+  lista. Prueba varias horas hasta que una dé el aviso con alternativas, o
+  `mockReset()` para reordenar cuáles son.
 
 ## Cuando `agenda-service` esté arriba
 
@@ -60,6 +62,10 @@ Con eso basta. Si quieres, luego puedes quitar `mock.js` y su línea
 > ⚠️ El OpenAPI declara `servers: http://localhost:8080` pero `CLAUDE.md` y
 > `docs/CONSTRUCCION.md` exponen `agenda-service` en `:8081`. Pendiente de
 > aclarar con el equipo; `config.js` usa 8081 por ahora.
+
+Como la PWA se sirve desde otro puerto que la API, `agenda-service` tendrá que
+permitir CORS para el origen donde corra la PWA (`GET`, `POST`, `DELETE` y la
+cabecera `Idempotency-Key`).
 
 ## Prueba rápida (sin navegador)
 

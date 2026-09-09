@@ -41,7 +41,11 @@
     }
   }
   function nuevoEstado() {
-    return { citas: {}, idempotencia: {} };   // citas: token -> cita ; idempotencia: key -> token
+    return {
+      citas: {},            // token -> cita
+      idempotencia: {},     // Idempotency-Key -> token
+      cuposTomados: {},     // "profId|inicioISO" -> true  (cupos "fantasma" que ya rebotaron una vez)
+    };
   }
   function guardarEstado(e) {
     try { localStorage.setItem(CLAVE_ESTADO, JSON.stringify(e)); } catch (_) {}
@@ -114,7 +118,10 @@
       finMs > new Date(c.inicio).getTime());
   }
 
-  function cuposDelDia(estado, servicio, fecha, filtroProfesional, incluirFantasmas) {
+  // Cupos que se OFRECEN para una fecha. Los "fantasma" también se ofrecen
+  // (cuando cargaste la página estaban libres); es al reservarlos cuando el
+  // mock los rechaza con 409, igual que una carrera real por el mismo cupo.
+  function cuposDelDia(estado, servicio, fecha, filtroProfesional) {
     if (diaSemanaLocal(fecha) === 0) return [];          // domingo cerrado
     const ranuras = rejilla(fecha, servicio.duracionMin);
     const ahora = Date.now();
@@ -127,17 +134,17 @@
       ranuras.forEach((r, i) => {
         const ini = localAUtc(fecha, r.h, r.m);
         const fin = new Date(ini.getTime() + servicio.duracionMin * 60000);
-        if (ini.getTime() <= ahora) return;                       // ya pasó
-        if (chocaConCita(estado, prof.id, ini.getTime(), fin.getTime())) return;
-        const esFantasma = fantasmas.has(i);
-        if (esFantasma && !incluirFantasmas) return;              // no lo mostramos, pero al reservar da 409
+        const clave = prof.id + '|' + ini.toISOString();
+        if (ini.getTime() <= ahora) return;                                    // ya pasó
+        if (chocaConCita(estado, prof.id, ini.getTime(), fin.getTime())) return; // hay cita
+        if (estado.cuposTomados[clave]) return;                                // fantasma ya rebotado
         cupos.push({
           inicio: ini.toISOString(),
           fin: fin.toISOString(),
           horaLocal: horaLocalDe(ini.toISOString()),
           profesionalId: prof.id,
           profesionalNombre: prof.nombre,
-          _fantasma: esFantasma,
+          _fantasma: fantasmas.has(i),
         });
       });
     }
@@ -191,7 +198,7 @@
       if (!fechaValida(fecha)) return err(400, 'DATOS_INVALIDOS', 'La fecha no tiene un formato válido.');
       const servicio = SERVICIOS.find(s => s.id === servicioId);
       if (!servicio) return err(404, 'NO_ENCONTRADO', 'No encontramos ese servicio.');
-      const cupos = cuposDelDia(estado, servicio, fecha, profesionalId, false).map(limpiar);
+      const cupos = cuposDelDia(estado, servicio, fecha, profesionalId).map(limpiar);
       return ok(200, { fecha, zonaHoraria: ZONA, cupos });
     }
 
@@ -224,14 +231,18 @@
       const fin = new Date(ini.getTime() + servicio.duracionMin * 60000);
       const fecha = new Date(ini.getTime() + ZONA_OFFSET_MIN * 60000).toISOString().slice(0, 10);
 
-      // ¿El cupo sigue libre? (choque real o "fantasma" = se acaba de ocupar)
-      const todos = cuposDelDia(estado, servicio, fecha, null, true);
+      // ¿El cupo sigue libre? El "fantasma" se veía libre pero rebota (y a
+      // partir de aquí queda tomado de verdad, como una carrera real).
+      const todos = cuposDelDia(estado, servicio, fecha, null);
       const elegido = todos.find(c => c.inicio === ini.toISOString() && c.profesionalId === prof.id);
-      const chocado = !elegido ||
-        elegido._fantasma ||
+      const chocado = !elegido || elegido._fantasma ||
         chocaConCita(estado, prof.id, ini.getTime(), fin.getTime());
 
       if (chocado) {
+        if (elegido && elegido._fantasma) {
+          estado.cuposTomados[prof.id + '|' + ini.toISOString()] = true;
+          guardarEstado(estado);
+        }
         const libres = todos
           .filter(c => !c._fantasma && c.inicio !== ini.toISOString())
           .sort((a, x) => Math.abs(new Date(a.inicio) - ini) - Math.abs(new Date(x.inicio) - ini))

@@ -65,10 +65,16 @@ chk('cupo: inicio UTC y horaLocal = UTC-5',
   cupo.inicio.endsWith('Z') &&
   Number(cupo.horaLocal.slice(0, 2)) === (new Date(cupo.inicio).getUTCHours() + 19) % 24);
 
-const reserva = { servicioId: SERV, profesionalId: cupo.profesionalId, inicio: cupo.inicio, clienteNombre: 'Juan Perez', clienteCelular: '3001234567' };
-let creada = await MB.handle('POST', POST, { headers: { 'Idempotency-Key': uuid() }, body: reserva });
+// algún cupo mostrado puede ser "fantasma" (409); reservamos hasta dar con uno bueno
+let creada = null;
+let reserva = null;
+for (const c of r.body.cupos) {
+  const body = { servicioId: SERV, profesionalId: c.profesionalId, inicio: c.inicio, clienteNombre: 'Juan Perez', clienteCelular: '3001234567' };
+  const res = await MB.handle('POST', POST, { headers: { 'Idempotency-Key': uuid() }, body });
+  if (res.status === 201) { creada = res; reserva = body; break; }
+}
 chk('reservar: 201 + CitaCreada + enlaceGestion',
-  creada.status === 201 && creada.body.estado === 'CONFIRMADA' && creada.body.enlaceGestion.includes('/v1/gestion/'));
+  !!creada && creada.body.estado === 'CONFIRMADA' && creada.body.enlaceGestion.includes('/v1/gestion/'));
 
 r = await MB.handle('POST', POST, { headers: { 'Idempotency-Key': uuid() }, body: { ...reserva, clienteNombre: 'Otra' } });
 chk('mismo cupo: 409 CUPO_OCUPADO + alternativas[]',
@@ -99,21 +105,22 @@ chk('token inexistente => 404 NO_ENCONTRADO', r.status === 404 && r.body.codigo 
 r = await MB.handle('GET', `/v1/publico/barberia-el-corte/disponibilidad?servicioId=${SERV}&fecha=${domingo}`);
 chk('domingo cerrado => sin cupos', r.status === 200 && r.body.cupos.length === 0);
 
-// cupo "fantasma": se ve libre pero rebota (simula "se acaba de ocupar")
+// cupo "fantasma": se muestra libre en disponibilidad pero rebota al confirmar
 const MB2 = backend();
 const dia = fechaEnDia(3, 60);
-const visibles = new Set((await MB2.handle('GET', `/v1/publico/barberia-el-corte/disponibilidad?servicioId=${SERV}&fecha=${dia}`))
-  .body.cupos.map((c) => c.profesionalId + '@' + c.inicio));
+const libres = (await MB2.handle('GET', `/v1/publico/barberia-el-corte/disponibilidad?servicioId=${SERV}&fecha=${dia}`)).body.cupos;
 let fantasma = null;
-for (const prof of ['33333333-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333334']) {
-  for (let h = 13; h <= 22 && !fantasma; h++) {
-    const inicio = `${dia}T${String(h).padStart(2, '0')}:00:00.000Z`;
-    if (visibles.has(prof + '@' + inicio)) continue;
-    const res = await MB2.handle('POST', POST, { headers: { 'Idempotency-Key': uuid() }, body: { servicioId: SERV, profesionalId: prof, inicio, clienteNombre: 'Test', clienteCelular: '3001112233' } });
-    if (res.status === 409) fantasma = res;
-  }
+for (const c of libres) {
+  const res = await MB2.handle('POST', POST, { headers: { 'Idempotency-Key': uuid() }, body: { servicioId: SERV, profesionalId: c.profesionalId, inicio: c.inicio, clienteNombre: 'Test Fantasma', clienteCelular: '3001112233' } });
+  if (res.status === 409) { fantasma = { res, cupo: c }; break; }
 }
-chk('cupo fantasma => 409 con alternativas', !!fantasma && fantasma.body.codigo === 'CUPO_OCUPADO' && fantasma.body.alternativas.length > 0);
+chk('un cupo mostrado libre => 409 CUPO_OCUPADO con alternativas',
+  !!fantasma && fantasma.res.body.codigo === 'CUPO_OCUPADO' && fantasma.res.body.alternativas.length > 0);
+if (fantasma) {
+  const post = await MB2.handle('GET', `/v1/publico/barberia-el-corte/disponibilidad?servicioId=${SERV}&fecha=${dia}`);
+  chk('tras rebotar, ese cupo desaparece de la lista',
+    !post.body.cupos.some((c) => c.inicio === fantasma.cupo.inicio && c.profesionalId === fantasma.cupo.profesionalId));
+}
 
 console.log(fallos === 0 ? '\n✅ TODO OK' : `\n❌ ${fallos} FALLAS`);
 process.exit(fallos ? 1 : 0);

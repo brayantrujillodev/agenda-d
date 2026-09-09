@@ -21,11 +21,13 @@
     if (CFG.useMock) {
       return window.MockBackend.handle(method, path, { headers, body });
     }
+    const cabeceras = { ...(headers || {}) };
+    if (body != null) cabeceras['Content-Type'] = 'application/json';
     let res;
     try {
       res = await fetch(CFG.apiBase + path, {
         method,
-        headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+        headers: cabeceras,
         body: body != null ? JSON.stringify(body) : undefined,
       });
     } catch (_) {
@@ -147,8 +149,8 @@
         btn.type = 'button';
         btn.className = 'servicio';
         btn.innerHTML = `
-          <span>
-            <span class="servicio__nombre"></span><br>
+          <span class="servicio__info">
+            <span class="servicio__nombre"></span>
             <span class="servicio__meta"></span>
           </span>
           <span class="servicio__precio"></span>`;

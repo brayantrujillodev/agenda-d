@@ -1,6 +1,8 @@
 /* AGENDA-D · PWA pública de reserva · estilos nativos, sin framework */
 
 :root {
+  color-scheme: light dark;   /* que los controles nativos (input date) sigan el tema */
+
   --primario: #0d9488;
   --primario-osc: #0f766e;
   --primario-claro: #ccfbf1;
@@ -35,6 +37,7 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  overflow-x: hidden;   /* red de seguridad: el cuerpo nunca hace scroll horizontal */
 }
 
 body {
@@ -168,10 +171,12 @@ body {
 
 .servicio:hover { border-color: var(--primario); }
 
-.servicio__nombre { font-weight: 600; font-size: 1.05rem; }
-.servicio__meta { color: var(--texto-suave); font-size: .88rem; }
+.servicio__info { min-width: 0; }
+.servicio__nombre { display: block; font-weight: 600; font-size: 1.05rem; }
+.servicio__meta { display: block; color: var(--texto-suave); font-size: .88rem; }
 .servicio__precio {
   flex-shrink: 0;
+  white-space: nowrap;
   font-weight: 700;
   color: var(--primario-osc);
 }
@@ -192,12 +197,22 @@ body {
 
 .campo__control {
   width: 100%;
+  min-width: 0;          /* los <input type=date/tel> traen un ancho intrínseco que rompe el layout */
+  max-width: 100%;
   padding: 12px;
   border: 1px solid var(--borde);
   border-radius: 10px;
   background: var(--superficie);
   color: var(--texto);
   font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* el input de fecha en móvil: que ocupe el ancho y no empuje la página */
+input[type="date"].campo__control {
+  display: block;
+  min-height: 46px;
 }
 
 .campo__control:focus {
