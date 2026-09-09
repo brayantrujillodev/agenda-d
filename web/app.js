@@ -124,13 +124,44 @@
 
   const estaOffline = () => !navigator.onLine;
 
+  // --- iconos SVG (inline, sin assets) ---
+  const SVG_RELOJ = '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.4V8l2.6 1.6"/></svg>';
+  const SVG_CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+  const SVG_TIJERAS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.4"/><circle cx="6" cy="17" r="2.4"/><path d="M8 8.4 19 15M8 15.6 19 9"/><circle cx="12.4" cy="12" r=".6" fill="currentColor"/></svg>';
+  const SVG_PEINE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="4.5" rx="1.4"/><path d="M6 11.5v6M10 11.5v6M14 11.5v5M18 11.5v6"/></svg>';
+
+  function iconoServicio(nombre) {
+    return /barba|afeit|bigote/i.test(nombre || '') ? SVG_PEINE : SVG_TIJERAS;
+  }
+
+  // Marca el stepper (1 servicio · 2 fecha · 3 confirmar) en la vista activa.
+  function montarPasos(v, activo) {
+    const hueco = v.querySelector('[data-pasos]');
+    if (!hueco) return;
+    const frag = document.getElementById('tpl-pasos').content.cloneNode(true);
+    frag.querySelectorAll('.paso').forEach((li) => {
+      const n = Number(li.dataset.paso);
+      if (n < activo) {
+        li.classList.add('paso--hecho');
+        li.querySelector('.paso__bolita').innerHTML = SVG_CHECK;
+      } else if (n === activo) {
+        li.classList.add('paso--activo');
+      } else {
+        li.classList.add('paso--pendiente');
+      }
+    });
+    hueco.replaceWith(frag);
+  }
+
   // ==========================================================================
   //  Vista · lista de servicios   (#/)
   // ==========================================================================
 
   async function vistaServicios() {
     const v = pintar('tpl-servicios');
+    montarPasos(v, 1);
     const lista = v.querySelector('[data-lista]');
+    const barra = v.querySelector('[data-barra]');
     lista.innerHTML = '<li class="cupos__vacio">Cargando servicios…</li>';
 
     try {
@@ -143,28 +174,46 @@
         lista.innerHTML = '<li class="cupos__vacio">Este negocio todavía no publicó servicios.</li>';
         return;
       }
-      lista.replaceChildren(...r.body.map((s) => {
+
+      let elegido = null;
+      const botones = r.body.map((s) => {
         const li = document.createElement('li');
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'servicio';
         btn.innerHTML = `
+          <span class="miniatura">${iconoServicio(s.nombre)}</span>
           <span class="servicio__info">
             <span class="servicio__nombre"></span>
-            <span class="servicio__meta"></span>
+            <span class="linea-meta">${SVG_RELOJ}<span data-dur></span></span>
           </span>
-          <span class="servicio__precio"></span>`;
+          <span class="servicio__precio"></span>
+          <span class="servicio__check">${SVG_CHECK}</span>`;
         btn.querySelector('.servicio__nombre').textContent = s.nombre;
-        btn.querySelector('.servicio__meta').textContent = `${s.duracionMin} min`;
+        btn.querySelector('[data-dur]').textContent = `${s.duracionMin} min`;
         btn.querySelector('.servicio__precio').textContent = dinero(s.precio);
         btn.addEventListener('click', () => {
-          flujo.servicio = s;
-          flujo.cupo = null;
-          location.hash = `#/reservar?servicio=${encodeURIComponent(s.id)}`;
+          elegido = s;
+          botones.forEach((x) => x.classList.toggle('servicio--sel', x === btn));
+          barra.hidden = false;
         });
         li.appendChild(btn);
-        return li;
-      }));
+        return btn;
+      });
+      lista.replaceChildren(...botones.map((b) => b.parentNode));
+
+      // preseleccionar si volvemos del paso 2
+      if (flujo.servicio) {
+        const i = r.body.findIndex((s) => s.id === flujo.servicio.id);
+        if (i >= 0) { botones[i].click(); }
+      }
+
+      v.querySelector('[data-continuar]').addEventListener('click', () => {
+        if (!elegido) return;
+        if (!flujo.servicio || flujo.servicio.id !== elegido.id) flujo.cupo = null;
+        flujo.servicio = elegido;
+        location.hash = `#/reservar?servicio=${encodeURIComponent(elegido.id)}`;
+      });
     } catch (e) {
       lista.innerHTML = `<li class="cupos__error">${
         e instanceof SinRed
@@ -189,21 +238,34 @@
 
     const s = flujo.servicio;
     const v = pintar('tpl-disponibilidad');
+    montarPasos(v, 2);
+    v.querySelector('[data-mini]').innerHTML = iconoServicio(s.nombre);
     v.querySelector('[data-servicio-nombre]').textContent = s.nombre;
-    v.querySelector('[data-servicio-detalle]').textContent = `${s.duracionMin} min · ${dinero(s.precio)}`;
+    v.querySelector('[data-servicio-detalle]').innerHTML = `${SVG_RELOJ}${s.duracionMin} min · ${dinero(s.precio)}`;
     v.querySelector('[data-volver]').addEventListener('click', () => { location.hash = '#/'; });
 
     const input = v.querySelector('[data-fecha]');
     const cont = v.querySelector('[data-cupos]');
+    const barra = v.querySelector('[data-barra]');
     input.min = hoyLocal();
     input.value = flujo.fecha && flujo.fecha >= hoyLocal() ? flujo.fecha : hoyLocal();
     input.addEventListener('change', () => cargar());
+
+    let seleccion = null;
+    v.querySelector('[data-continuar]').addEventListener('click', () => {
+      if (!seleccion) return;
+      flujo.cupo = seleccion;
+      flujo.idemKey = nuevaClave();   // cupo nuevo => intento nuevo de reserva
+      location.hash = '#/datos';
+    });
 
     let peticion = 0;   // descarta respuestas de una fecha que el usuario ya cambió
     cargar();
 
     async function cargar() {
       const mia = ++peticion;
+      seleccion = null;
+      barra.hidden = true;
       flujo.fecha = input.value;
       if (!flujo.fecha) return;
       cont.innerHTML = '<p class="cupos__vacio">Buscando horarios…</p>';
@@ -219,16 +281,21 @@
           cont.innerHTML = '<p class="cupos__vacio">No hay cupos libres ese día. Prueba con otra fecha.</p>';
           return;
         }
-        cont.replaceChildren(...cupos.map((c) => {
+        const botones = cupos.map((c) => {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'cupo';
           b.innerHTML = '<span class="cupo__hora"></span><span class="cupo__prof"></span>';
           b.querySelector('.cupo__hora').textContent = c.horaLocal;
           b.querySelector('.cupo__prof').textContent = c.profesionalNombre;
-          b.addEventListener('click', () => elegirCupo(c));
+          b.addEventListener('click', () => {
+            seleccion = c;
+            botones.forEach((x) => x.classList.toggle('cupo--sel', x === b));
+            barra.hidden = false;
+          });
           return b;
-        }));
+        });
+        cont.replaceChildren(...botones);
       } catch (e) {
         if (mia !== peticion) return;
         cont.innerHTML = e instanceof SinRed
@@ -236,12 +303,6 @@
           : '<p class="cupos__error">No pudimos cargar los horarios.</p>';
       }
     }
-  }
-
-  function elegirCupo(cupo) {
-    flujo.cupo = cupo;
-    flujo.idemKey = nuevaClave();   // cupo nuevo => intento nuevo
-    location.hash = '#/datos';
   }
 
   // ==========================================================================
@@ -255,6 +316,7 @@
     }
 
     const v = pintar('tpl-datos');
+    montarPasos(v, 3);
     const form = v.querySelector('[data-form]');
     const avisoConflicto = v.querySelector('[data-conflicto]');
     const boton = v.querySelector('[data-enviar]');
@@ -530,8 +592,10 @@
   window.addEventListener('hashchange', enrutar);
 
   function arrancar() {
-    document.getElementById('negocio-nombre').textContent = CFG.negocioNombre || 'Reserva tu cita';
-    document.getElementById('modo-demo').hidden = !CFG.useMock;
+    if (CFG.negocioNombre) {
+      document.getElementById('negocio-nombre').textContent = CFG.negocioNombre;
+      document.getElementById('pie-nombre').textContent = CFG.negocioNombre;
+    }
     pintarOffline();
     if (!location.hash) history.replaceState(null, '', '#/');
     enrutar();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0d9488">
+  <meta name="theme-color" content="#26382e">
   <meta name="description" content="Reserva tu cita en línea, sin crear cuenta.">
   <title>Reserva tu cita</title>
 
@@ -20,49 +20,106 @@
 
   <header class="cabecera">
     <a class="cabecera__marca" href="#/">
-      <span class="cabecera__logo" aria-hidden="true">📅</span>
+      <span class="poste" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26">
+          <rect x="7.5" y="3.5" width="9" height="17" rx="4.5" fill="#fbfaf6"/>
+          <clipPath id="poste-c"><rect x="7.5" y="3.5" width="9" height="17" rx="4.5"/></clipPath>
+          <g clip-path="url(#poste-c)" stroke-width="3.4">
+            <path d="M2 8 L14 -4 M2 16 L18 0 M2 24 L22 4 M6 26 L26 6" stroke="#b23b3b"/>
+            <path d="M-2 8 L10 -4 M-2 16 L10 4 M2 22 L14 10 M6 30 L18 18" stroke="#2f5c93"/>
+          </g>
+          <rect x="6.3" y="2" width="11.4" height="3" rx="1.5" fill="#c9a24b"/>
+          <rect x="6.3" y="19" width="11.4" height="3" rx="1.5" fill="#c9a24b"/>
+        </svg>
+      </span>
       <span id="negocio-nombre">Reserva tu cita</span>
     </a>
-    <span id="modo-demo" class="etiqueta-demo" hidden title="Datos de ejemplo del contrato OpenAPI">demo</span>
   </header>
 
   <main id="app" class="contenedor">
-    <!-- app.js pinta cada vista aquí -->
     <p class="cargando">Cargando…</p>
   </main>
 
   <footer class="pie">
-    AGENDA-D · Proyecto de aula · Programación Avanzada
+    <span class="pie__marca">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <rect x="8" y="4" width="8" height="16" rx="4" fill="currentColor"/>
+        <rect x="7" y="2.5" width="10" height="2.6" rx="1.3" fill="currentColor"/>
+        <rect x="7" y="18.9" width="10" height="2.6" rx="1.3" fill="currentColor"/>
+      </svg>
+      <span id="pie-nombre">Barbería El Corte</span>
+    </span>
+    <span class="pie__sep" aria-hidden="true"></span>
+    <span class="pie__lema">Buena apariencia, mejor actitud.</span>
   </footer>
 
-  <!-- plantillas de vista -->
+  <!-- ================= plantillas de vista ================= -->
+
+  <template id="tpl-pasos">
+    <ol class="pasos" aria-label="Progreso de la reserva">
+      <li class="paso" data-paso="1"><span class="paso__bolita">1</span><span class="paso__txt">Selecciona un servicio</span></li>
+      <li class="paso" data-paso="2"><span class="paso__bolita">2</span><span class="paso__txt">Elige la fecha y hora</span></li>
+      <li class="paso" data-paso="3"><span class="paso__bolita">3</span><span class="paso__txt">Confirma tu cita</span></li>
+    </ol>
+  </template>
+
   <template id="tpl-servicios">
     <section class="vista">
+      <div data-pasos></div>
       <h1 class="vista__titulo">¿Qué servicio necesitas?</h1>
       <p class="vista__ayuda">Elige uno para ver los horarios disponibles.</p>
       <ul class="lista-servicios" data-lista></ul>
+
+      <div class="barra-accion" data-barra hidden>
+        <button type="button" class="boton boton--primario" data-continuar>Continuar &nbsp;→</button>
+      </div>
     </section>
   </template>
 
   <template id="tpl-disponibilidad">
     <section class="vista">
-      <button class="volver" data-volver type="button">‹ Cambiar servicio</button>
-      <h1 class="vista__titulo" data-servicio-nombre></h1>
-      <p class="vista__ayuda" data-servicio-detalle></p>
+      <div data-pasos></div>
+      <button class="volver" data-volver type="button">
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M10 3l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Cambiar servicio
+      </button>
+
+      <article class="resumen-servicio">
+        <span class="miniatura" data-mini></span>
+        <div class="resumen-servicio__info">
+          <span class="resumen-servicio__nombre" data-servicio-nombre></span>
+          <span class="linea-meta" data-servicio-detalle></span>
+        </div>
+      </article>
 
       <label class="campo">
-        <span class="campo__etiqueta">Día</span>
+        <span class="campo__etiqueta">
+          <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 2v3M10.5 2v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Día
+        </span>
         <input type="date" data-fecha class="campo__control">
       </label>
 
+      <h2 class="seccion">
+        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.4V8l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Horarios disponibles
+      </h2>
       <div class="cupos" data-cupos aria-live="polite"></div>
+
+      <div class="barra-accion" data-barra hidden>
+        <button type="button" class="boton boton--primario" data-continuar>Continuar &nbsp;→</button>
+      </div>
     </section>
   </template>
 
   <template id="tpl-datos">
     <section class="vista">
-      <button class="volver" data-volver type="button">‹ Elegir otro horario</button>
-      <h1 class="vista__titulo">Tus datos</h1>
+      <div data-pasos></div>
+      <button class="volver" data-volver type="button">
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M10 3l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Elegir otro horario
+      </button>
+      <h1 class="vista__titulo">Confirma tu cita</h1>
       <p class="resumen-cita" data-resumen></p>
 
       <form data-form novalidate>
@@ -83,16 +140,16 @@
 
         <p class="aviso-conflicto" data-conflicto hidden></p>
 
-        <button type="submit" class="boton boton--primario" data-enviar>
-          Confirmar reserva
-        </button>
+        <button type="submit" class="boton boton--primario" data-enviar>Confirmar reserva</button>
       </form>
     </section>
   </template>
 
   <template id="tpl-confirmada">
     <section class="vista vista--exito">
-      <div class="marca-exito" aria-hidden="true">✓</div>
+      <div class="marca-exito" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <h1 class="vista__titulo">¡Cita confirmada!</h1>
       <dl class="detalle-cita" data-detalle></dl>
 
@@ -102,7 +159,7 @@
           <input type="text" data-enlace readonly class="campo__control">
           <button type="button" class="boton boton--secundario" data-copiar>Copiar</button>
         </div>
-        <a class="enlace-simple" data-abrir-gestion href="#/">Abrir mi cita ahora ›</a>
+        <a class="enlace-simple" data-abrir-gestion href="#/">Abrir mi cita ahora →</a>
       </div>
 
       <a class="boton boton--secundario" href="#/">Reservar otra cita</a>

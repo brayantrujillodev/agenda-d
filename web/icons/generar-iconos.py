@@ -7,13 +7,12 @@ Genera los íconos PNG de la PWA sin dependencias externas (solo la stdlib).
 Dibuja un calendario blanco sobre fondo teal (#0d9488, el theme_color).
 Se versiona el script, no hace falta commitear a mano cada PNG si cambia el diseño.
 """
-import math
 import struct
 import zlib
 from pathlib import Path
 
-TEAL = (13, 148, 136)
-WHITE = (255, 255, 255)
+TEAL = (47, 77, 60)   # verde bosque, el color de marca de la PWA
+WHITE = (251, 250, 246)
 SS = 3  # supersampling para bordes suaves
 
 AQUI = Path(__file__).resolve().parent
@@ -33,13 +32,8 @@ def inside_rrect(x, y, x0, y0, x1, y1, rtl, rtr, rbr, rbl):
     return True
 
 
-def dist_seg(x, y, a, b):
-    ax, ay = a
-    bx, by = b
-    dx, dy = bx - ax, by - ay
-    l2 = dx * dx + dy * dy or 1.0
-    t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / l2))
-    return math.hypot(x - (ax + t * dx), y - (ay + t * dy))
+GOLD = (201, 162, 75)
+STRIPE = (178, 59, 59)   # rojo clásico de las franjas del poste
 
 
 def color_at(x, y, size, full_bleed, scale):
@@ -55,31 +49,26 @@ def color_at(x, y, size, full_bleed, scale):
     else:
         return (0, 0, 0, 0)
 
-    cx0, cx1 = ox + 0.13 * cs, ox + 0.87 * cs
-    cy0, cy1 = oy + 0.26 * cs, oy + 0.85 * cs
-    rr = 0.06 * cs
+    # --- poste de barbero, centrado ---
+    pw = 0.235 * cs                     # ancho del cilindro
+    pxc = ox + 0.50 * cs
+    px0, px1 = pxc - pw / 2, pxc + pw / 2
+    body_y0, body_y1 = oy + 0.15 * cs, oy + 0.85 * cs
+    cap_h = 0.072 * cs
+    cap_w = pw + 0.115 * cs
 
-    # aros de la carpeta: blancos, atraviesan el borde superior del calendario
-    hw = 0.035 * cs
-    for hxc in (ox + 0.36 * cs, ox + 0.64 * cs):
-        if inside_rrect(x, y, hxc - hw, oy + 0.17 * cs, hxc + hw, oy + 0.32 * cs, hw, hw, hw, hw):
-            col = WHITE
+    # tapas doradas
+    for cyc in (body_y0 + cap_h / 2, body_y1 - cap_h / 2):
+        if inside_rrect(x, y, pxc - cap_w / 2, cyc - cap_h / 2, pxc + cap_w / 2, cyc + cap_h / 2,
+                        cap_h / 2, cap_h / 2, cap_h / 2, cap_h / 2):
+            col = GOLD
 
-    if inside_rrect(x, y, cx0, cy0, cx1, cy1, rr, rr, rr, rr):
-        col = WHITE
-        band = inside_rrect(x, y, cx0, cy0, cx1, oy + 0.40 * cs, rr, rr, 0, 0)
-        if band:
-            col = TEAL
-            for hxc in (ox + 0.36 * cs, ox + 0.64 * cs):
-                if inside_rrect(x, y, hxc - hw, oy + 0.17 * cs, hxc + hw, oy + 0.32 * cs, hw, hw, hw, hw):
-                    col = WHITE
-        else:
-            p1 = (ox + 0.31 * cs, oy + 0.63 * cs)
-            p2 = (ox + 0.44 * cs, oy + 0.73 * cs)
-            p3 = (ox + 0.71 * cs, oy + 0.51 * cs)
-            d = min(dist_seg(x, y, p1, p2), dist_seg(x, y, p2, p3))
-            if d <= 0.052 * cs:
-                col = TEAL
+    # cilindro blanco con franjas diagonales verdes
+    cyl_y0, cyl_y1 = body_y0 + cap_h, body_y1 - cap_h
+    if inside_rrect(x, y, px0, cyl_y0, px1, cyl_y1, pw / 2, pw / 2, pw / 2, pw / 2):
+        periodo = 0.135 * cs
+        fase = ((x + y) % (2 * periodo)) / periodo
+        col = STRIPE if fase < 1.0 else WHITE
 
     return (col[0], col[1], col[2], 255)
 

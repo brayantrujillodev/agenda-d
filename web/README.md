@@ -5,6 +5,11 @@ La única pantalla que ve el cliente final. HTML, CSS y JavaScript nativo.
 
 Cierra el issue #4.
 
+Línea visual: barbería — verde bosque + crema, poste de barbero, patrón de
+herramientas en el encabezado. Modo claro y oscuro. Un stepper de 3 pasos
+(servicio → fecha y hora → confirmar) guía la reserva; cada paso de selección
+tiene su botón **Continuar →**.
+
 ## Cómo probarla
 
 Un service worker no funciona con `file://`, hace falta un servidor estático.
@@ -22,7 +27,7 @@ Abre <http://localhost:5173>. Para probar la instalación como PWA en el
 celular, sirve por HTTPS o usa el reenvío de puertos de Chrome DevTools
 (`chrome://inspect` → Port forwarding).
 
-## Modo demo (sin backend)
+## Sin backend (datos de ejemplo)
 
 Mientras `agenda-service` no exista, `config.js` trae `useMock: true` y
 `mock.js` responde los mismos endpoints con los ejemplos de
@@ -94,11 +99,11 @@ celular, domingo cerrado. No sustituye probarlo en el navegador.
 ## Flujo
 
 ```
-#/                     elegir servicio
-#/reservar?servicio=…  elegir día y cupo
-#/datos                nombre + celular  →  POST /citas
-#/confirmada           enlace de gestión
-#/gestion/{token}      ver / cancelar la cita
+#/  (paso 1)            elegir servicio  → Continuar
+#/reservar  (paso 2)    elegir día y cupo  → Continuar
+#/datos  (paso 3)       nombre + celular  →  POST /citas
+#/confirmada            enlace de gestión
+#/gestion/{token}       ver / cancelar la cita   (fuera del stepper)
 ```
 
 ## Reglas que respeta (CLAUDE.md)
