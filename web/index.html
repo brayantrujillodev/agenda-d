@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d9488">
+  <meta name="description" content="Reserva tu cita en línea, sin crear cuenta.">
+  <title>Reserva tu cita</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="banner-offline" class="banner banner--offline" hidden>
+    Sin conexión. Puedes mirar los servicios, pero para reservar necesitas internet.
+  </div>
+
+  <header class="cabecera">
+    <a class="cabecera__marca" href="#/">
+      <span class="cabecera__logo" aria-hidden="true">📅</span>
+      <span id="negocio-nombre">Reserva tu cita</span>
+    </a>
+    <span id="modo-demo" class="etiqueta-demo" hidden title="Datos de ejemplo del contrato OpenAPI">demo</span>
+  </header>
+
+  <main id="app" class="contenedor">
+    <!-- app.js pinta cada vista aquí -->
+    <p class="cargando">Cargando…</p>
+  </main>
+
+  <footer class="pie">
+    AGENDA-D · Proyecto de aula · Programación Avanzada
+  </footer>
+
+  <!-- plantillas de vista -->
+  <template id="tpl-servicios">
+    <section class="vista">
+      <h1 class="vista__titulo">¿Qué servicio necesitas?</h1>
+      <p class="vista__ayuda">Elige uno para ver los horarios disponibles.</p>
+      <ul class="lista-servicios" data-lista></ul>
+    </section>
+  </template>
+
+  <template id="tpl-disponibilidad">
+    <section class="vista">
+      <button class="volver" data-volver type="button">‹ Cambiar servicio</button>
+      <h1 class="vista__titulo" data-servicio-nombre></h1>
+      <p class="vista__ayuda" data-servicio-detalle></p>
+
+      <label class="campo">
+        <span class="campo__etiqueta">Día</span>
+        <input type="date" data-fecha class="campo__control">
+      </label>
+
+      <div class="cupos" data-cupos aria-live="polite"></div>
+    </section>
+  </template>
+
+  <template id="tpl-datos">
+    <section class="vista">
+      <button class="volver" data-volver type="button">‹ Elegir otro horario</button>
+      <h1 class="vista__titulo">Tus datos</h1>
+      <p class="resumen-cita" data-resumen></p>
+
+      <form data-form novalidate>
+        <label class="campo">
+          <span class="campo__etiqueta">Nombre completo</span>
+          <input type="text" name="clienteNombre" class="campo__control"
+                 autocomplete="name" minlength="2" maxlength="120" required>
+          <span class="campo__error" data-error="clienteNombre"></span>
+        </label>
+
+        <label class="campo">
+          <span class="campo__etiqueta">Celular (10 dígitos)</span>
+          <input type="tel" name="clienteCelular" class="campo__control"
+                 autocomplete="tel" inputmode="numeric" pattern="[0-9]{10}"
+                 maxlength="10" required placeholder="3001234567">
+          <span class="campo__error" data-error="clienteCelular"></span>
+        </label>
+
+        <p class="aviso-conflicto" data-conflicto hidden></p>
+
+        <button type="submit" class="boton boton--primario" data-enviar>
+          Confirmar reserva
+        </button>
+      </form>
+    </section>
+  </template>
+
+  <template id="tpl-confirmada">
+    <section class="vista vista--exito">
+      <div class="marca-exito" aria-hidden="true">✓</div>
+      <h1 class="vista__titulo">¡Cita confirmada!</h1>
+      <dl class="detalle-cita" data-detalle></dl>
+
+      <div class="gestion-enlace">
+        <p class="vista__ayuda">Guarda este enlace para consultar o cancelar tu cita:</p>
+        <div class="gestion-enlace__fila">
+          <input type="text" data-enlace readonly class="campo__control">
+          <button type="button" class="boton boton--secundario" data-copiar>Copiar</button>
+        </div>
+        <a class="enlace-simple" data-abrir-gestion href="#/">Abrir mi cita ahora ›</a>
+      </div>
+
+      <a class="boton boton--secundario" href="#/">Reservar otra cita</a>
+    </section>
+  </template>
+
+  <template id="tpl-gestion">
+    <section class="vista">
+      <h1 class="vista__titulo">Tu cita</h1>
+      <dl class="detalle-cita" data-detalle></dl>
+
+      <div data-acciones>
+        <button type="button" class="boton boton--peligro" data-cancelar>Cancelar esta cita</button>
+      </div>
+
+      <p class="aviso-cancelada" data-cancelada hidden>
+        Esta cita está cancelada. El cupo quedó libre para otra persona.
+      </p>
+      <a class="boton boton--secundario" href="#/">Ir al inicio</a>
+    </section>
+  </template>
+
+  <template id="tpl-error">
+    <section class="vista vista--error">
+      <h1 class="vista__titulo" data-titulo>Algo salió mal</h1>
+      <p class="vista__ayuda" data-mensaje></p>
+      <a class="boton boton--secundario" href="#/">Volver al inicio</a>
+    </section>
+  </template>
+
+  <script src="config.js"></script>
+  <script src="mock.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

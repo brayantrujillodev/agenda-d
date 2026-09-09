@@ -35,7 +35,7 @@ prevista, pero solo el perfil `infra` levanta sin errores.
 | `notificaciones-service` | ⬜ por construir |
 | `gateway-graphql` | ⬜ por construir |
 | `analitica-service` | ⬜ por construir |
-| PWA de reserva | ⬜ por construir |
+| PWA de reserva | 🟡 flujo completo contra datos de ejemplo (`web/`); falta apuntarla a `agenda-service` |
 
 ---
 
