@@ -9,9 +9,16 @@ Java 21 · Spring Boot 3.3 · Maven (pom propio, sin proyecto padre) · puerto 8
 
 | Rama | Alcance |
 |---|---|
-| `feature/1-esqueleto-agenda` | *(esta)* Arranca, conecta a Postgres, Flyway resuelve el esquema. Sin entidades ni controladores. |
-| `feature/2-...` | Entidades JPA + `GET /v1/publico/{slug}/disponibilidad` |
+| `feature/1-esqueleto-agenda` | Arranca, conecta a Postgres, Flyway resuelve el esquema. Sin entidades ni controladores. |
+| `feature/2-entidades-disponibilidad` | *(esta)* Entidades JPA del esquema `agenda` + `GET /v1/publico/{slug}/servicios` y `GET /v1/publico/{slug}/disponibilidad` |
 | `feature/3-...` | `POST /v1/publico/{slug}/citas` con el 409 del `EXCLUDE` + outbox |
+
+### Endpoints de esta rama
+
+- `GET /v1/publico/{slug}/servicios` — servicios activos del negocio
+- `GET /v1/publico/{slug}/disponibilidad?servicioId=&fecha=&profesionalId=` — cupos
+  libres: cruza horario de atención, bloqueos y citas; convierte hora local a UTC
+  con `negocio.zona_horaria`. `fecha` en hora local del negocio (`AAAA-MM-DD`).
 
 ## Arrancar
 
