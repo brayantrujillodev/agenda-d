@@ -48,7 +48,7 @@ services:
     networks: [agenda-net]
 
   kafka:
-    image: bitnami/kafka:3.7
+    image: bitnamilegacy/kafka:3.7
     container_name: agd-kafka
     profiles: [infra, core, full]
     environment:
