@@ -13,13 +13,14 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
-# FASE 1 · Semanas 1–5 · Cimientos y persistencia
+## FASE 1 · Semanas 1–5 · Cimientos y persistencia
 
 Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 
 ---
 
 ### 🔴 #1 · Crear el repositorio y la estructura base
+
 **Asignado:** Brayan · **Toca:** raíz, `.github/` · **Depende de:** nada
 
 - [ ] Repo `agenda-d` en GitHub, privado, los cuatro como colaboradores
@@ -33,6 +34,7 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 ---
 
 ### 🔴 #2 · Docker Compose con Postgres y Kafka
+
 **Asignado:** Johan · **Toca:** `docker-compose.yml` · **Depende de:** #1
 
 - [ ] Perfiles `core` y `full`
@@ -50,6 +52,7 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 ---
 
 ### 🔴 #3 · Migración Flyway con el esquema completo
+
 **Asignado:** Andrés · **Toca:** `agenda-service/src/main/resources/db/migration/`
 **Depende de:** #2
 
@@ -59,6 +62,7 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 - [ ] Datos de prueba: un negocio, dos servicios, dos profesionales, horarios
 
 **Aceptación:** corre limpio contra Postgres 16 y estos tres casos se cumplen:
+
 1. Cita 10:00–11:00 con Laura → entra
 2. Cita 10:30–11:30 con Laura → **rechazada** por `cita_sin_solape`
 3. Cita 10:00–11:00 con Andrés → entra
@@ -69,6 +73,7 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 ---
 
 ### 🔴 #4 · Esqueletos de los servicios Spring Boot
+
 **Asignado:** Luis · **Toca:** `*/pom.xml`, `*/Dockerfile`, `*/Application.java`, `*/application.yml`
 **Depende de:** #2
 
@@ -83,6 +88,7 @@ los cuatro `/actuator/health` responden `UP`.
 ---
 
 ### 🟡 #5 · Revisar y aprobar los contratos
+
 **Asignado:** los cuatro · **Toca:** `docs/openapi/`, `docs/graphql/`, `docs/eventos/`
 **Depende de:** #1
 
@@ -95,6 +101,7 @@ resuelve `panelRecepcion` y qué lleva `citas.reservadas`.
 ---
 
 ### 🟡 #6 · Dominio y repositorios
+
 **Asignado:** Brayan · **Toca:** `agenda-service/.../domain/`, `.../repository/`
 **Depende de:** #3, #4
 
@@ -107,6 +114,7 @@ resuelve `panelRecepcion` y qué lleva `citas.reservadas`.
 ---
 
 ### 🟡 #7 · Cálculo de disponibilidad
+
 **Asignado:** Brayan · **Toca:** `.../service/DisponibilidadService.java` · **Depende de:** #6
 
 - [ ] Cruza horario de atención + bloqueos + citas existentes
@@ -122,6 +130,7 @@ cambio de día por zona horaria (19:00 en Colombia es del día siguiente en UTC)
 ---
 
 ### 🟡 #8 · Reservar cita
+
 **Asignado:** Andrés · **Toca:** `.../service/ReservaService.java`, `.../controller/CitaPublicaController.java`
 **Depende de:** #6
 
@@ -135,7 +144,7 @@ cambio de día por zona horaria (19:00 en Colombia es del día siguiente en UTC)
 
 ---
 
-# FASE 2 · Semanas 6–10 · Flujo mínimo completo
+## FASE 2 · Semanas 6–10 · Flujo mínimo completo
 
 **El hito del semestre.** Al cerrarla, el sistema recorre el circuito entero:
 REST → persistencia → Kafka → consumidor → GraphQL. Cada pieza en su versión
@@ -144,6 +153,7 @@ más simple; lo importante es que cierre.
 ---
 
 ### 🔴 #9 · Tabla outbox y relay de publicación
+
 **Asignado:** Andrés · **Toca:** `agenda-service/.../outbox/` · **Depende de:** #8
 
 - [ ] `INSERT` en outbox dentro de la misma transacción que la cita
@@ -158,6 +168,7 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 ---
 
 ### 🔴 #10 · notificaciones-service consumiendo
+
 **Asignado:** Johan · **Toca:** `notificaciones-service/` · **Depende de:** #9
 
 - [ ] Consume `citas.reservadas` y `citas.canceladas`
@@ -168,6 +179,7 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 ---
 
 ### 🔴 #11 · Gateway GraphQL con `panelRecepcion`
+
 **Asignado:** Luis · **Toca:** `gateway-graphql/` · **Depende de:** #7, #8
 
 - [ ] Esquema cargado desde `schema.graphqls`
@@ -183,6 +195,7 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 ---
 
 ### 🟡 #12 · Cancelar y reprogramar por token
+
 **Asignado:** Brayan · **Toca:** `.../controller/GestionController.java` · **Depende de:** #8
 
 - [ ] `GET /v1/gestion/{token}` con el celular enmascarado
@@ -194,6 +207,7 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 ---
 
 ### 🟡 #13 · PWA · pantalla pública de reserva
+
 **Asignado:** Johan · **Toca:** `web/index.html`, `web/app.js`, `web/style.css`, `web/manifest.json`, `web/sw.js`
 **Depende de:** #7, #8
 
@@ -211,6 +225,7 @@ punta contra el backend real.
 ---
 
 ### 🟢 #14 · Configuración del negocio
+
 **Asignado:** Luis · **Toca:** `.../controller/ConfiguracionController.java` · **Depende de:** #6
 
 - [ ] CRUD de servicios y profesionales, horarios y bloqueos
@@ -221,6 +236,7 @@ punta contra el backend real.
 ---
 
 ### 🟢 #15 · Agenda del profesional y asistencia
+
 **Asignado:** Luis · **Toca:** `.../controller/AgendaController.java` · **Depende de:** #6
 
 - [ ] `GET /v1/agenda/{profesionalId}?fecha=`
@@ -230,7 +246,7 @@ punta contra el backend real.
 
 ---
 
-# FASE 3 · Semanas 11–15 · Robustez
+## FASE 3 · Semanas 11–15 · Robustez
 
 Solo cuando el circuito de la Fase 2 cierre de punta a punta. Si vamos
 atrasados, se recorta desde aquí hacia arriba.
@@ -238,46 +254,53 @@ atrasados, se recorta desde aquí hacia arriba.
 ---
 
 ### 🟡 #16 · Reintentos y cola de mensajes fallidos
+
 **Asignado:** Andrés · **Depende de:** #9
 Tres reintentos con espera creciente, luego `citas.dlq`. Endpoint que lista lo
 caído y alerta en el panel. **Aceptación:** un consumidor que falla siempre
 deja el mensaje en la DLQ y no bloquea la partición.
 
 ### 🟡 #17 · Pruebas con Testcontainers
+
 **Asignado:** Brayan · **Depende de:** #8
 Postgres y Kafka reales. Incluye la **prueba de concurrencia**: 100 hilos sobre
 el mismo cupo, 1 con 201 y 99 con 409. **Aceptación:** pasa 10 veces seguidas.
 **No se borra ni se marca `@Disabled` nunca.**
 
 ### 🟡 #18 · Recordatorio de 24 horas
+
 **Asignado:** Johan · **Depende de:** #10
 Programación persistida en tabla, `@Scheduled` que dispara los vencidos,
 recuperación al reiniciar, cancelación al cancelar la cita.
 **Aceptación:** se programa, se reinicia el contenedor y el recordatorio sale.
 
 ### 🟢 #19 · analitica-service
+
 **Asignado:** Luis · **Depende de:** #9
 Consume los tres tópicos y actualiza `metrica_diaria`. `GET /v1/metricas`.
 Se conecta al `panelRecepcion` que ya existe.
 **Aceptación:** las cifras cuadran con la tabla `cita`.
 
 ### 🟢 #20 · PWA · panel de recepción
+
 **Asignado:** Johan · **Depende de:** #11, #19
 Agenda del día, configuración y métricas, en una sola consulta GraphQL.
 
 ### 🟢 #21 · Separación entre negocios
+
 **Asignado:** Andrés · **Depende de:** #14
 Prueba negativa que intenta leer una cita de otro negocio por su UUID directo
 y debe obtener respuesta vacía.
 
 ### 🟢 #22 · Documentación final y guion de sustentación
+
 **Asignado:** los cuatro · **Depende de:** todo
 README al día y un guion de 10 minutos que **cualquiera** pueda dar.
 Ensayarlo dos veces.
 
 ---
 
-# Cómo trabajar cada tarea
+## Cómo trabajar cada tarea
 
 1. `git checkout main && git pull`
 2. `git checkout -b feature/8-reservar-cita`
@@ -288,7 +311,7 @@ Ensayarlo dos veces.
 6. PR contra `main`, describiendo qué se probó
 7. **Lo revisa alguien de la otra pareja**, no tu compañero de tarea
 
-## Por qué la revisión cruzada
+### Por qué la revisión cruzada
 
 El profesor elige a **uno solo** para sustentar y la nota es grupal. Si Johan
 nunca vio el código del `EXCLUDE` y le toca a él, se hunden los cuatro.

@@ -117,7 +117,7 @@ services:
       - "8081:8081"          # la ruta pública del cliente entra por aquí
     depends_on:
       postgres: { condition: service_healthy }
-      kafka:    { condition: service_healthy }
+      kafka: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
       interval: 10s
@@ -141,7 +141,7 @@ services:
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     depends_on:
       postgres: { condition: service_healthy }
-      kafka:    { condition: service_healthy }
+      kafka: { condition: service_healthy }
     mem_limit: 512m
     networks: [agenda-net]
 
@@ -172,7 +172,7 @@ services:
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     depends_on:
       postgres: { condition: service_healthy }
-      kafka:    { condition: service_healthy }
+      kafka: { condition: service_healthy }
     mem_limit: 512m
     networks: [agenda-net]
 

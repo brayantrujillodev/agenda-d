@@ -1,0 +1,17 @@
+# Configuración de sqlfluff para AGENDA-D.
+# Local:  py -m sqlfluff lint db/
+# CI:     .github/workflows/lint.yml
+#
+# Alcance deliberado: la migración es DDL crítico y está alineada a mano
+# (columnas en columnas). sqlfluff actúa aquí como control de SINTAXIS, no
+# como formateador: si el archivo no parsea contra el dialecto de Postgres,
+# CI falla. Las reglas de maquetación quedan desactivadas para no romper la
+# alineación ni tocar `db/V1__esquema_inicial.sql`.
+[sqlfluff]
+dialect = postgres
+templater = raw
+max_line_length = 120
+exclude_rules = layout, aliasing, references.quoting, capitalisation.literals
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
