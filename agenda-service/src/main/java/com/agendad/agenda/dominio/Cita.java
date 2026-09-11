@@ -82,6 +82,24 @@ public class Cita {
         this.actualizadaEn = ahora;
     }
 
+    /** ¿Sigue en pie? Solo una cita CONFIRMADA puede cancelarse o atenderse. */
+    public boolean estaConfirmada() {
+        return estado == EstadoCita.CONFIRMADA;
+    }
+
+    public boolean estaCancelada() {
+        return estado == EstadoCita.CANCELADA;
+    }
+
+    /**
+     * Marca la cita como cancelada. El cupo vuelve a estar libre: la
+     * restricción {@code cita_sin_solape} deja de contar esta fila.
+     */
+    public void cancelar() {
+        this.estado = EstadoCita.CANCELADA;
+        this.actualizadaEn = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }

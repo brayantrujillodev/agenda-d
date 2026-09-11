@@ -11,7 +11,8 @@ Java 21 · Spring Boot 3.3 · Maven (pom propio, sin proyecto padre) · puerto 8
 |---|---|
 | `feature/1-esqueleto-agenda` | Arranca, conecta a Postgres, Flyway resuelve el esquema. Sin entidades ni controladores. |
 | `feature/2-entidades-disponibilidad` | Entidades JPA del esquema `agenda` + `GET /v1/publico/{slug}/servicios` y `GET /v1/publico/{slug}/disponibilidad` |
-| `feature/3-outbox` | *(esta)* `POST /v1/publico/{slug}/citas` (409 del `EXCLUDE` + idempotencia) + tabla `outbox` en la misma transacción + relay `@Scheduled` que publica `citas.reservadas` |
+| `feature/3-outbox` | `POST /v1/publico/{slug}/citas` (409 del `EXCLUDE` + idempotencia) + tabla `outbox` en la misma transacción + relay `@Scheduled` que publica `citas.reservadas` |
+| `feature/12-gestion-token` | *(esta)* `GET` y `DELETE /v1/gestion/{token}` — el cliente consulta y cancela su cita por token; cancelar publica `citas.canceladas` por outbox |
 
 ### Endpoints de esta rama
 
@@ -24,13 +25,19 @@ Java 21 · Spring Boot 3.3 · Maven (pom propio, sin proyecto padre) · puerto 8
   `INSERT` y, si `cita_sin_solape` lo rechaza, responde `409 CUPO_OCUPADO` con los
   cupos más cercanos. En la misma transacción escribe la cita, su token de gestión
   y una fila en `agenda.outbox`.
+- `GET /v1/gestion/{token}` — detalle de una sola cita por su token; el celular
+  va enmascarado (`300****567`).
+- `DELETE /v1/gestion/{token}?confirmar=true` — cancela la cita (libera el cupo:
+  `cita_sin_solape` deja de contarla) y encola `citas.canceladas` en `agenda.outbox`.
+  `confirmar=true` es obligatorio. Reprogramar no está en el contrato OpenAPI.
 
 ### Outbox → Kafka
 
 `OutboxRelay` (`@Scheduled`, cada `AGENDAD_OUTBOX_INTERVALO_MS` ms, 2000 por
 defecto) lee las filas de `agenda.outbox` con `enviado_en IS NULL`, las publica en
-`citas.reservadas` con clave de partición `profesionalId` y las marca como
-enviadas. Sin reintentos con espera ni DLQ todavía (Fase 3).
+su tópico (`citas.reservadas`, `citas.canceladas`) con clave de partición
+`profesionalId` y las marca como enviadas. Sin reintentos con espera ni DLQ
+todavía (Fase 3).
 
 Prueba de la sustentación:
 
