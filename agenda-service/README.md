@@ -10,8 +10,8 @@ Java 21 · Spring Boot 3.3 · Maven (pom propio, sin proyecto padre) · puerto 8
 | Rama | Alcance |
 |---|---|
 | `feature/1-esqueleto-agenda` | Arranca, conecta a Postgres, Flyway resuelve el esquema. Sin entidades ni controladores. |
-| `feature/2-entidades-disponibilidad` | *(esta)* Entidades JPA del esquema `agenda` + `GET /v1/publico/{slug}/servicios` y `GET /v1/publico/{slug}/disponibilidad` |
-| `feature/3-...` | `POST /v1/publico/{slug}/citas` con el 409 del `EXCLUDE` + outbox |
+| `feature/2-entidades-disponibilidad` | Entidades JPA del esquema `agenda` + `GET /v1/publico/{slug}/servicios` y `GET /v1/publico/{slug}/disponibilidad` |
+| `feature/3-outbox` | *(esta)* `POST /v1/publico/{slug}/citas` (409 del `EXCLUDE` + idempotencia) + tabla `outbox` en la misma transacción + relay `@Scheduled` que publica `citas.reservadas` |
 
 ### Endpoints de esta rama
 
@@ -19,6 +19,27 @@ Java 21 · Spring Boot 3.3 · Maven (pom propio, sin proyecto padre) · puerto 8
 - `GET /v1/publico/{slug}/disponibilidad?servicioId=&fecha=&profesionalId=` — cupos
   libres: cruza horario de atención, bloqueos y citas; convierte hora local a UTC
   con `negocio.zona_horaria`. `fecha` en hora local del negocio (`AAAA-MM-DD`).
+- `POST /v1/publico/{slug}/citas` — reserva. Cabecera `Idempotency-Key` obligatoria
+  (reenviarla devuelve la cita original). No consulta disponibilidad: intenta el
+  `INSERT` y, si `cita_sin_solape` lo rechaza, responde `409 CUPO_OCUPADO` con los
+  cupos más cercanos. En la misma transacción escribe la cita, su token de gestión
+  y una fila en `agenda.outbox`.
+
+### Outbox → Kafka
+
+`OutboxRelay` (`@Scheduled`, cada `AGENDAD_OUTBOX_INTERVALO_MS` ms, 2000 por
+defecto) lee las filas de `agenda.outbox` con `enviado_en IS NULL`, las publica en
+`citas.reservadas` con clave de partición `profesionalId` y las marca como
+enviadas. Sin reintentos con espera ni DLQ todavía (Fase 3).
+
+Prueba de la sustentación:
+
+```bash
+docker compose stop kafka      # apagas el bus
+# reservas 2 citas por curl -> responden 201 igual
+docker compose start kafka     # lo prendes
+# a los pocos segundos, los 2 eventos aparecen en el tópico
+```
 
 ## Arrancar
 
