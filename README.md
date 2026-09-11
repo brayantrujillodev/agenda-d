@@ -33,7 +33,7 @@ prevista, pero solo el perfil `infra` levanta sin errores.
 | Contratos OpenAPI, GraphQL y de eventos | ✅ acordados |
 | `agenda-service` | ⬜ por construir |
 | `notificaciones-service` | ⬜ por construir |
-| `gateway-graphql` | ⬜ por construir |
+| `gateway-graphql` | ✅ panelRecepcion con fallback de contrato |
 | `analitica-service` | ⬜ por construir |
 | PWA de reserva | ⬜ por construir |
 
@@ -75,7 +75,7 @@ medida que existan los proyectos con su `pom.xml` y su `Dockerfile`.
 | Kafka desde el equipo | localhost:29092 | activo |
 | Consola de Kafka | http://localhost:8090 | activo |
 | agenda-service | http://localhost:8081 | por construir |
-| gateway GraphQL | http://localhost:8080/graphiql | por construir |
+| gateway GraphQL | http://localhost:8080/graphiql | activo |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
 
