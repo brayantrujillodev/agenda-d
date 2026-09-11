@@ -36,7 +36,7 @@ definido, pero solo el perfil `infra` levanta sin errores.
 | `notificaciones-service` | ⬜ por construir |
 | `gateway-graphql` | ⬜ por construir |
 | `analitica-service` | ⬜ por construir |
-| PWA de reserva | ⬜ por construir |
+| PWA de reserva | 🟡 flujo completo contra datos de ejemplo (`web/`); falta apuntarla a `agenda-service` |
 
 > **Avance · 2026-08-28.** Repo publicado con `.gitignore`, licencia MIT,
 > contratos, migración y `docker-compose`. `agenda-service` arrancado en dos
