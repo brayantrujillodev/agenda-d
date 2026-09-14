@@ -71,3 +71,7 @@ agendad:
   outbox:
     # Cada cuánto el relay busca eventos pendientes y los publica.
     intervalo-ms: ${AGENDAD_OUTBOX_INTERVALO_MS:2000}
+  cors:
+    # Orígenes desde los que la PWA (web/) puede llamar esta API por fetch().
+    # Separados por coma. Ampliar cuando la PWA se publique en un dominio real.
+    origenes-permitidos: ${AGENDAD_CORS_ORIGENES:http://localhost:5173,http://127.0.0.1:5173}
