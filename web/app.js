@@ -580,6 +580,51 @@
   }
 
   // ==========================================================================
+  //  Instalación de la PWA
+  // ==========================================================================
+  // Chrome no muestra su propio prompt de instalación a menos que se lo pidamos:
+  // dispara beforeinstallprompt y espera a que llamemos a prompt(). Guardamos
+  // ese evento para lanzarlo desde nuestro propio botón (mejor que depender de
+  // que alguien encuentre "Instalar" en el menú del navegador).
+
+  const CLAVE_INSTALAR_DESCARTADO = 'agenda-d.instalar-descartado-en';
+  const DIAS_ANTES_DE_REOFRECER = 14;
+
+  let promptDeInstalacion = null;
+
+  const corriendoInstalada = () =>
+    window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+  function descartadoRecientemente() {
+    try {
+      const en = Number(localStorage.getItem(CLAVE_INSTALAR_DESCARTADO));
+      return Boolean(en) && (Date.now() - en) < DIAS_ANTES_DE_REOFRECER * 86400000;
+    } catch (_) { return false; }
+  }
+
+  function marcarInstalarDescartado() {
+    try { localStorage.setItem(CLAVE_INSTALAR_DESCARTADO, String(Date.now())); } catch (_) {}
+  }
+
+  function ocultarBannerInstalar() {
+    document.getElementById('banner-instalar').hidden = true;
+  }
+
+  window.addEventListener('beforeinstallprompt', (ev) => {
+    ev.preventDefault();   // no dejamos que el navegador muestre su propio mini-banner
+    promptDeInstalacion = ev;
+    if (!corriendoInstalada() && !descartadoRecientemente()) {
+      document.getElementById('banner-instalar').hidden = false;
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    promptDeInstalacion = null;
+    ocultarBannerInstalar();
+    marcarInstalarDescartado();   // ya instalada: no tiene sentido volver a ofrecerla
+  });
+
+  // ==========================================================================
   //  Arranque
   // ==========================================================================
 
@@ -599,6 +644,18 @@
     pintarOffline();
     if (!location.hash) history.replaceState(null, '', '#/');
     enrutar();
+
+    document.querySelector('[data-instalar]').addEventListener('click', async () => {
+      ocultarBannerInstalar();
+      if (!promptDeInstalacion) return;
+      promptDeInstalacion.prompt();
+      try { await promptDeInstalacion.userChoice; } catch (_) { /* el usuario cerró el diálogo nativo */ }
+      promptDeInstalacion = null;
+    });
+    document.querySelector('[data-cerrar-instalar]').addEventListener('click', () => {
+      ocultarBannerInstalar();
+      marcarInstalarDescartado();
+    });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => { /* sin SW la app igual funciona */ });
