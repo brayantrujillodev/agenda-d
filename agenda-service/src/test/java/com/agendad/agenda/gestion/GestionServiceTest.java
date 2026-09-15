@@ -17,7 +17,7 @@ import com.agendad.agenda.dominio.Outbox;
 import com.agendad.agenda.dominio.Profesional;
 import com.agendad.agenda.dominio.Servicio;
 import com.agendad.agenda.dominio.TokenGestion;
-import com.agendad.agenda.gestion.dto.CitaDetalleResponse;
+import com.agendad.agenda.comun.dto.CitaDetalleResponse;
 import com.agendad.agenda.repositorio.CitaRepository;
 import com.agendad.agenda.repositorio.NegocioRepository;
 import com.agendad.agenda.repositorio.OutboxRepository;

@@ -100,6 +100,16 @@ public class Cita {
         this.actualizadaEn = Instant.now();
     }
 
+    /**
+     * Cierra la cita con su resultado ({@code ATENDIDA} o {@code NO_ASISTIO}).
+     * El llamador valida que la cita esté {@code CONFIRMADA}: aquí solo se
+     * aplica el cambio.
+     */
+    public void marcarResultado(EstadoCita resultado) {
+        this.estado = resultado;
+        this.actualizadaEn = Instant.now();
+    }
+
     public UUID getId() {
         return id;
     }

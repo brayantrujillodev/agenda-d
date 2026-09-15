@@ -19,6 +19,13 @@ public interface CitaRepository extends JpaRepository<Cita, UUID> {
      */
     Optional<Cita> findByNegocioIdAndIdempotencyKey(UUID negocioId, String idempotencyKey);
 
+    /** Filtra por negocio en toda ruta administrativa: nunca se expone una cita de otro negocio. */
+    Optional<Cita> findByIdAndNegocioId(UUID id, UUID negocioId);
+
+    /** Agenda de un profesional para el día [inicioDia, finDia) en UTC, ordenada por hora. */
+    List<Cita> findByNegocioIdAndProfesionalIdAndInicioGreaterThanEqualAndInicioLessThanOrderByInicio(
+            UUID negocioId, UUID profesionalId, Instant inicioDia, Instant finDia);
+
     /**
      * Citas no canceladas de esos profesionales que se cruzan con la ventana
      * [inicioVentana, finVentana). Se usa para descartar cupos ya ocupados.

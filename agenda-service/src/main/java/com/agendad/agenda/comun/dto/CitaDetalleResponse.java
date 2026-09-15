@@ -1,12 +1,13 @@
-package com.agendad.agenda.gestion.dto;
+package com.agendad.agenda.comun.dto;
 
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Detalle de una cita para la ruta de gestión por token. Contrato:
- * {@code CitaDetalle}. El celular va enmascarado ({@code 300****567}): esta
- * ruta da acceso a UNA cita, no a datos de terceros.
+ * Detalle de una cita. Contrato: {@code CitaDetalle}. Lo usan dos rutas con
+ * criterios distintos de enmascarado: gestión por token (celular enmascarado,
+ * da acceso a una sola cita) y agenda del profesional (celular completo, la
+ * pide el propio negocio).
  */
 public record CitaDetalleResponse(
         UUID id,
