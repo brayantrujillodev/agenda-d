@@ -21,10 +21,11 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 1 en curso.** Hoy funciona la infraestructura y los contratos están
-versionados en el repo. `agenda-service` ya tiene proyecto y se construye por
-partes; los demás servicios aún no tienen proyecto. El Compose deja todo
-definido, pero solo el perfil `infra` levanta sin errores.
+**Fase 1 cerrada. Fase 2 (flujo mínimo) casi cerrada — falta `gateway-graphql`.**
+`agenda-service` reserva contra la base real, publica por outbox y
+`notificaciones-service` ya consume. El único tramo del circuito que falta
+por completo es el gateway GraphQL. Detalle de tareas y dueños en
+[`docs/TAREAS.md`](docs/TAREAS.md).
 
 | Componente | Estado |
 |---|---|
@@ -32,18 +33,17 @@ definido, pero solo el perfil `infra` levanta sin errores.
 | Kafka en KRaft y su consola | ✅ funciona |
 | Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
-| `agenda-service` | 🔶 en curso — [PR #6](../../pull/6) esqueleto, [PR #7](../../pull/7) entidades + disponibilidad (en revisión) |
-| `notificaciones-service` | ⬜ por construir |
-| `gateway-graphql` | ⬜ por construir |
-| `analitica-service` | ⬜ por construir |
-| PWA de reserva | 🟡 flujo completo contra datos de ejemplo (`web/`); falta apuntarla a `agenda-service` |
+| `agenda-service` | ✅ disponibilidad, reserva con outbox, gestión por token · 🟢 falta `GET /v1/agenda/{profesionalId}` (fuera del circuito mínimo) |
+| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas` · ⚠️ rama pendiente sube a Java 25, no mergear así (CLAUDE.md exige Java 21) |
+| `gateway-graphql` | ⬜ por construir — **es el hueco que falta para cerrar Fase 2** |
+| `analitica-service` | ⬜ por construir (Fase 3, no es momento aún) |
+| PWA de reserva | 🟡 UI completa (`web/`) contra backend real pendiente de merge — CORS y conexión ya resueltos en ramas sin mergear |
 
-> **Avance · 2026-08-28.** Repo publicado con `.gitignore`, licencia MIT,
-> contratos, migración y `docker-compose`. `agenda-service` arrancado en dos
-> PRs apilados: #6 (esqueleto Spring Boot 3.3 que arranca y aplica la
-> migración) y #7 (entidades del esquema `agenda` + `GET /v1/publico/{slug}/servicios`
-> y `GET /v1/publico/{slug}/disponibilidad`). Ningún PR mergeado todavía y el
-> `docker compose --profile core` aún no se ha verificado de punta a punta.
+> **Avance · 2026-09-14.** Fase 1 completa. Fase 2: reserva + outbox +
+> notificaciones + PWA (UI) mergeados a `main`. Pendiente de merge: CORS y
+> conexión de la PWA al backend real. Sin empezar: `gateway-graphql` con
+> `panelRecepcion`, que es lo único que falta para que el circuito
+> REST → Kafka → consumidor → GraphQL cierre de punta a punta.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -162,24 +162,25 @@ correctas pero van después. El plan está ordenado según eso.
 
 Capacidad real: ~20 horas semanales entre los cuatro.
 
-### Fase 1 · Semanas 1–5 · Cimientos
+### Fase 1 · Semanas 1–5 · Cimientos — ✅ cerrada
 
 - [x] Contratos OpenAPI, GraphQL y de eventos en el repo (`docs/`)
 - [x] Migración con el `EXCLUDE` en el repo (`db/V1__esquema_inicial.sql`)
-- [ ] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service` → PR [#6](../../pull/6)
-- [ ] `docker compose --profile core up` levanta agenda-service con `/actuator/health` → PR [#6](../../pull/6)
-- [ ] `agenda-service` consulta cupos → PR [#7](../../pull/7) · reserva contra la BD real → rama 3 (pendiente)
+- [x] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service`
+- [x] `docker compose --profile core up` levanta agenda-service con `/actuator/health`
+- [x] `agenda-service` consulta cupos y reserva contra la BD real
 
-### Fase 2 · Semanas 6–10 · Flujo mínimo completo
+### Fase 2 · Semanas 6–10 · Flujo mínimo completo — 🔶 en curso
 
 **El hito del semestre.** Al cerrarlo, el sistema recorre el circuito entero.
 
-- [ ] Outbox publicando `citas.reservadas`
-- [ ] `notificaciones-service` consumiendo y guardando el mensaje
-- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion`
-- [ ] PWA pública de reserva contra la API real
+- [x] Outbox publicando `citas.reservadas`
+- [x] `notificaciones-service` consumiendo y guardando el mensaje
+- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion` — **sin empezar, es lo que falta cerrar**
+- [ ] PWA pública de reserva contra la API real — UI lista, conexión al backend real en rama sin mergear
 
 Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
+Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
 
 ### Fase 3 · Semanas 11–15 · Robustez
 

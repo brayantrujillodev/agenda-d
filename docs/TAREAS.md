@@ -13,34 +13,57 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
+## Estado y próximos pasos · 2026-09-14
+
+Fase 1 está cerrada de punta a punta. Fase 2 (el hito del semestre) tiene
+**un solo hueco bloqueante real: `gateway-graphql` no existe todavía.**
+Sin eso el circuito REST → Kafka → consumidor → GraphQL no cierra, aunque
+todo lo demás ya funcione.
+
+| Quién | Qué tiene pendiente ahora mismo | Por qué es su turno |
+|---|---|---|
+| **Luis** | Empezar `gateway-graphql`: esqueleto + resolver de `panelRecepcion` llamando a `agenda-service` por REST (#11) | Es el único issue 🔴 de Fase 2 sin arrancar. Bloquea el cierre del hito. |
+| **Andrés** | Abrir PR de `fix/agenda-service-cors` (ya probada) y de `feature/4-pwa-conectar-backend` (PWA contra el backend real, ya no contra mock) | Ambas ramas están listas en el remoto, solo faltan revisión y merge |
+| **Johan** | **No mergear** `feature/10-notificaciones-service` tal como está: sube a Java 25 / Spring Boot 3.5, y CLAUDE.md fija Java 21 · Spring Boot 3.3 | Evita que el stack se desalinee del contrato del docente |
+| **Brayan** | Revisar cruzado los PRs de Luis y Andrés cuando salgan; si sobra tiempo, arrancar `GET /v1/agenda/{profesionalId}` (#15, ver abajo) | Ya cerró su parte de agenda-service (dominio, EXCLUDE, outbox, gestión por token) |
+
+Pendientes menores de Fase 2 que **no** bloquean el cierre del circuito pero
+quedan abiertos: `feature/4-pwa-instalable-lighthouse` (botón de instalación
+propio) puede revisarse y mergearse cuando alguien tenga un rato libre.
+
+---
+
 ## FASE 1 · Semanas 1–5 · Cimientos y persistencia
 
 Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 
 ---
 
-### 🔴 #1 · Crear el repositorio y la estructura base
+### ✅ #1 · Crear el repositorio y la estructura base — cerrado
 
 **Asignado:** Brayan · **Toca:** raíz, `.github/` · **Depende de:** nada
 
-- [ ] Repo `agenda-d` en GitHub, privado, los cuatro como colaboradores
-- [ ] `README.md`, `CLAUDE.md`, `.gitignore` (Java + Maven + IDE)
-- [ ] Carpetas de los 3 servicios, el gateway y `web/`
-- [ ] Rama `main` protegida: exige 1 aprobación para hacer merge
-- [ ] Plantilla de PR en `.github/pull_request_template.md`
+- [x] Repo `agenda-d` en GitHub, privado, los cuatro como colaboradores
+- [x] `README.md`, `CLAUDE.md`, `.gitignore` (Java + Maven + IDE)
+- [x] Carpetas de los 3 servicios, el gateway y `web/`
+- [ ] Rama `main` protegida: exige 1 aprobación para hacer merge — **verificar en GitHub, no se puede confirmar desde el repo local**
+- [x] Plantilla de PR en `.github/pull_request_template.md`
 
 **Aceptación:** los cuatro clonan y nadie puede hacer push directo a `main`.
 
 ---
 
-### 🔴 #2 · Docker Compose con Postgres y Kafka
+### ✅ #2 · Docker Compose con Postgres y Kafka — cerrado
 
 **Asignado:** Johan · **Toca:** `docker-compose.yml` · **Depende de:** #1
 
-- [ ] Perfiles `core` y `full`
-- [ ] `mem_limit` por contenedor (alguien tiene 8 GB)
-- [ ] Kafka en KRaft con listener externo en `localhost:29092`
-- [ ] Healthchecks en Postgres y Kafka
+- [x] Perfiles `core` y `full`
+- [x] `mem_limit` por contenedor (alguien tiene 8 GB)
+- [x] Kafka en KRaft con listener externo en `localhost:29092`
+- [x] Healthchecks en Postgres y Kafka
+
+> Requirió un hotfix aparte (`3e13239`): `bitnami/kafka` dejó de publicarse
+> en Docker Hub, se cambió a `bitnamilegacy/kafka:3.7`.
 
 **Aceptación:** `docker compose --profile core up -d` deja ambos sanos y
 `kafka-topics.sh --list` responde sin error.
@@ -51,15 +74,15 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 
 ---
 
-### 🔴 #3 · Migración Flyway con el esquema completo
+### ✅ #3 · Migración Flyway con el esquema completo — cerrado
 
 **Asignado:** Andrés · **Toca:** `agenda-service/src/main/resources/db/migration/`
 **Depende de:** #2
 
-- [ ] `V1__esquema_inicial.sql` con los tres esquemas
-- [ ] Restricción `EXCLUDE` sobre `cita`
-- [ ] Índice único de idempotencia
-- [ ] Datos de prueba: un negocio, dos servicios, dos profesionales, horarios
+- [x] `V1__esquema_inicial.sql` con los tres esquemas
+- [x] Restricción `EXCLUDE` sobre `cita`
+- [x] Índice único de idempotencia
+- [x] Datos de prueba: un negocio, dos servicios, dos profesionales, horarios
 
 **Aceptación:** corre limpio contra Postgres 16 y estos tres casos se cumplen:
 
@@ -72,15 +95,20 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 
 ---
 
-### 🔴 #4 · Esqueletos de los servicios Spring Boot
+### 🔶 #4 · Esqueletos de los servicios Spring Boot — parcial
 
 **Asignado:** Luis · **Toca:** `*/pom.xml`, `*/Dockerfile`, `*/Application.java`, `*/application.yml`
 **Depende de:** #2
 
-- [ ] Java 21, Spring Boot 3.3, un `pom.xml` por servicio (sin proyecto padre)
+- [x] Java 21, Spring Boot 3.3 — `agenda-service` y `notificaciones-service`
+- [ ] `gateway-graphql` y `analitica-service` siguen sin `pom.xml` (solo `.gitkeep`)
 - [ ] Dockerfile multi-stage por servicio
-- [ ] `/actuator/health` respondiendo en los cuatro
-- [ ] `agenda-service` con springdoc y Flyway conectados
+- [x] `/actuator/health` respondiendo en `agenda-service` y `notificaciones-service`
+- [x] `agenda-service` con springdoc y Flyway conectados
+
+> ⚠️ Una rama sin mergear (`feature/10-notificaciones-service`) sube
+> `notificaciones-service` a Java 25 / Spring Boot 3.5. **No mergear así**:
+> CLAUDE.md fija Java 21 · Spring Boot 3.3 para todo el proyecto.
 
 **Aceptación:** `docker compose --profile full up -d --build` levanta todo y
 los cuatro `/actuator/health` responden `UP`.
@@ -92,7 +120,7 @@ los cuatro `/actuator/health` responden `UP`.
 **Asignado:** los cuatro · **Toca:** `docs/openapi/`, `docs/graphql/`, `docs/eventos/`
 **Depende de:** #1
 
-- [ ] Cada uno lee el OpenAPI, el esquema GraphQL y el contrato de eventos
+- [ ] Cada uno lee el OpenAPI, el esquema GraphQL y el contrato de eventos — **confirmar en la próxima sesión semanal**
 - [ ] Se discuten los cambios en la sesión semanal y se aprueban por PR
 
 **Aceptación:** los cuatro pueden explicar qué devuelve `/disponibilidad`, qué
@@ -100,27 +128,27 @@ resuelve `panelRecepcion` y qué lleva `citas.reservadas`.
 
 ---
 
-### 🟡 #6 · Dominio y repositorios
+### ✅ #6 · Dominio y repositorios — cerrado
 
 **Asignado:** Brayan · **Toca:** `agenda-service/.../domain/`, `.../repository/`
 **Depende de:** #3, #4
 
-- [ ] Entidades JPA: Negocio, Servicio, Profesional, HorarioAtencion, Bloqueo, Cita
-- [ ] Repositorios Spring Data, todos filtrando por `negocioId`
-- [ ] `Instant` para instantes, nunca `LocalDateTime`
+- [x] Entidades JPA: Negocio, Servicio, Profesional, HorarioAtencion, Bloqueo, Cita
+- [x] Repositorios Spring Data, todos filtrando por `negocioId`
+- [x] `Instant` para instantes, nunca `LocalDateTime`
 
 **Aceptación:** test de integración que guarda y lee una cita.
 
 ---
 
-### 🟡 #7 · Cálculo de disponibilidad
+### ✅ #7 · Cálculo de disponibilidad — cerrado
 
 **Asignado:** Brayan · **Toca:** `.../service/DisponibilidadService.java` · **Depende de:** #6
 
-- [ ] Cruza horario de atención + bloqueos + citas existentes
-- [ ] Genera cupos según la duración del servicio
-- [ ] Convierte hora local del negocio a UTC correctamente
-- [ ] `GET /v1/publico/{slug}/disponibilidad`
+- [x] Cruza horario de atención + bloqueos + citas existentes
+- [x] Genera cupos según la duración del servicio
+- [x] Convierte hora local del negocio a UTC correctamente
+- [x] `GET /v1/publico/{slug}/disponibilidad`
 
 **Aceptación:** cubre día sin horario, día con bloqueo, día con cita tomada y
 cambio de día por zona horaria (19:00 en Colombia es del día siguiente en UTC).
@@ -129,15 +157,15 @@ cambio de día por zona horaria (19:00 en Colombia es del día siguiente en UTC)
 
 ---
 
-### 🟡 #8 · Reservar cita
+### ✅ #8 · Reservar cita — cerrado
 
 **Asignado:** Andrés · **Toca:** `.../service/ReservaService.java`, `.../controller/CitaPublicaController.java`
 **Depende de:** #6
 
-- [ ] `POST /v1/publico/{slug}/citas` con `Idempotency-Key`
-- [ ] Intenta el `INSERT` y captura la violación de `cita_sin_solape`
-- [ ] Traduce el conflicto a `409` con los cupos más cercanos
-- [ ] Genera el token de gestión y devuelve el enlace
+- [x] `POST /v1/publico/{slug}/citas` con `Idempotency-Key`
+- [x] Intenta el `INSERT` y captura la violación de `cita_sin_solape`
+- [x] Traduce el conflicto a `409` con los cupos más cercanos
+- [x] Genera el token de gestión y devuelve el enlace
 
 **Aceptación:** el `409` llega con mensaje en español y alternativas.
 **No se acepta** si valida disponibilidad con un `SELECT` antes de insertar.
@@ -152,13 +180,13 @@ más simple; lo importante es que cierre.
 
 ---
 
-### 🔴 #9 · Tabla outbox y relay de publicación
+### ✅ #9 · Tabla outbox y relay de publicación — cerrado
 
 **Asignado:** Andrés · **Toca:** `agenda-service/.../outbox/` · **Depende de:** #8
 
-- [ ] `INSERT` en outbox dentro de la misma transacción que la cita
-- [ ] `@Scheduled` que lee pendientes, publica y marca `enviado_en`
-- [ ] Clave de partición = `profesionalId`
+- [x] `INSERT` en outbox dentro de la misma transacción que la cita
+- [x] `@Scheduled` que lee pendientes, publica y marca `enviado_en`
+- [x] Clave de partición = `profesionalId`
 
 **Aceptación:** se apaga Kafka, se reservan 3 citas, se prende Kafka y los 3
 eventos aparecen publicados. **Demo estrella de la sustentación.**
@@ -167,22 +195,34 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 
 ---
 
-### 🔴 #10 · notificaciones-service consumiendo
+### 🔶 #10 · notificaciones-service consumiendo — funcional, con un pendiente
 
 **Asignado:** Johan · **Toca:** `notificaciones-service/` · **Depende de:** #9
 
-- [ ] Consume `citas.reservadas` y `citas.canceladas`
-- [ ] Guarda el mensaje en BD con el adaptador `REGISTRO` (sin costo)
+- [x] Consume `citas.reservadas` y `citas.canceladas`
+- [x] Guarda el mensaje en BD con el adaptador `REGISTRO` (sin costo)
+- [ ] Revertir el bump a Java 25 / Spring Boot 3.5 de `feature/10-notificaciones-service`
+      antes de mergear — mantener Java 21 · Spring Boot 3.3 (regla de CLAUDE.md).
+      Si la motivación era el CVE de PostgreSQL JDBC, subir solo la versión de esa
+      dependencia (`42.7.12`), no el JDK ni el Spring Boot padre.
 
 **Aceptación:** reservar desde la API deja un registro en la tabla de envíos.
 
 ---
 
-### 🔴 #11 · Gateway GraphQL con `panelRecepcion`
+### 🔴 #11 · Gateway GraphQL con `panelRecepcion` — SIN EMPEZAR, es el hueco crítico
 
 **Asignado:** Luis · **Toca:** `gateway-graphql/` · **Depende de:** #7, #8
 
-- [ ] Esquema cargado desde `schema.graphqls`
+`gateway-graphql/` solo tiene un `.gitkeep`. Ningún `pom.xml`, ninguna clase.
+De todo el flujo mínimo (REST → persistencia → outbox → Kafka → consumidor →
+GraphQL) es el único tramo que falta por completo. Con `agenda-service` ya
+sirviendo `/v1/publico/{slug}/disponibilidad`, `/v1/publico/{slug}/citas` y
+(falta) `/v1/agenda/{profesionalId}`, hay suficiente para construir el
+resolver.
+
+- [ ] `pom.xml` + esqueleto Spring Boot con Spring for GraphQL
+- [ ] Esquema cargado desde `docs/graphql/schema.graphqls`
 - [ ] Resolver de `panelRecepcion` llamando a `agenda-service` por REST
 - [ ] `/graphiql` habilitado para la demostración
 
@@ -194,28 +234,33 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 
 ---
 
-### 🟡 #12 · Cancelar y reprogramar por token
+### ✅ #12 · Cancelar y reprogramar por token — cerrado
 
 **Asignado:** Brayan · **Toca:** `.../controller/GestionController.java` · **Depende de:** #8
 
-- [ ] `GET /v1/gestion/{token}` con el celular enmascarado
-- [ ] `DELETE /v1/gestion/{token}?confirmar=true`
-- [ ] Token vencido o revocado → 404
+- [x] `GET /v1/gestion/{token}` con el celular enmascarado
+- [x] `DELETE /v1/gestion/{token}?confirmar=true`
+- [ ] Token vencido o revocado → 404 — **confirmar con un test manual/E2E**
 
 **Aceptación:** el token de una cita no da acceso a ninguna otra.
 
 ---
 
-### 🟡 #13 · PWA · pantalla pública de reserva
+### 🔶 #13 · PWA · pantalla pública de reserva — falta conectar al backend real
 
-**Asignado:** Johan · **Toca:** `web/index.html`, `web/app.js`, `web/style.css`, `web/manifest.json`, `web/sw.js`
+**Asignado:** Johan (líder original) · construida en la práctica por Andrés vía PR #12
+**Toca:** `web/index.html`, `web/app.js`, `web/style.css`, `web/manifest.json`, `web/sw.js`
 **Depende de:** #7, #8
 
-- [ ] Elegir servicio → ver cupos → nombre y celular → confirmar
-- [ ] Muestra el enlace de gestión al confirmar
-- [ ] Maneja el `409`: muestra alternativas, no un error feo
-- [ ] `manifest.json` + service worker que cachea la interfaz
-- [ ] Sin conexión: mensaje claro de que reservar requiere internet
+- [x] Elegir servicio → ver cupos → nombre y celular → confirmar
+- [x] Muestra el enlace de gestión al confirmar
+- [x] Maneja el `409`: muestra alternativas, no un error feo
+- [x] `manifest.json` + service worker que cachea la interfaz
+- [ ] Sin conexión: mensaje claro de que reservar requiere internet — **verificar**
+- [ ] **Conectar contra `agenda-service` real** (hoy corre contra `web/mock.js`).
+      Ya existen dos ramas remotas listas para esto: `fix/agenda-service-cors`
+      (habilita CORS) y `feature/4-pwa-conectar-backend` (apunta la PWA al
+      backend real). Falta abrir/mergear los PR.
 
 **Aceptación:** instalable en Android desde Chrome y se reserva de punta a
 punta contra el backend real.
@@ -226,7 +271,11 @@ punta contra el backend real.
 
 ### 🟢 #14 · Configuración del negocio
 
-**Asignado:** Luis · **Toca:** `.../controller/ConfiguracionController.java` · **Depende de:** #6
+**Asignado:** ~~Luis~~ → **Brayan**, si sobra tiempo tras la revisión cruzada
+**Toca:** `.../controller/ConfiguracionController.java` · **Depende de:** #6
+
+No existe todavía ningún `ConfiguracionController`. No bloquea el cierre de
+Fase 2, así que solo se toma si Luis sigue ocupado con `gateway-graphql` (#11).
 
 - [ ] CRUD de servicios y profesionales, horarios y bloqueos
 - [ ] Todos leen `X-Negocio-Id`
@@ -235,14 +284,29 @@ punta contra el backend real.
 
 ---
 
-### 🟢 #15 · Agenda del profesional y asistencia
+### ✅ #15 · Agenda del profesional y asistencia — cerrado (sin mergear)
 
-**Asignado:** Luis · **Toca:** `.../controller/AgendaController.java` · **Depende de:** #6
+**Asignado:** Brayan · **Toca:** `agenda-service/.../administracion/` · **Depende de:** #6
 
-- [ ] `GET /v1/agenda/{profesionalId}?fecha=`
-- [ ] `PATCH /v1/citas/{id}/estado` con `ATENDIDA` o `NO_ASISTIO`
+Implementado en rama local `feature/15-agenda-profesional`, pendiente de PR:
+
+- [x] `GET /v1/agenda/{profesionalId}?fecha=` — `AgendaController` + `AgendaService`,
+      valida que el profesional pertenezca al `X-Negocio-Id`, celular sin
+      enmascarar (a diferencia de la ruta de gestión, aquí lo pide el negocio)
+- [x] `PATCH /v1/citas/{id}/estado` con `ATENDIDA` o `NO_ASISTIO`, publica
+      `citas.estado` por outbox (clave de partición `profesionalId`)
+- [x] No permite marcar estado en una cita cancelada ni en una ya cerrada
+- [x] Pruebas unitarias (`AgendaServiceTest`, estilo `GestionServiceTest`)
+- [x] `ManejadorErrores` ahora traduce `X-Negocio-Id` faltante al formato
+      `{codigo, mensaje}` — primera ruta administrativa que exige esa cabecera
+- [x] Refactor menor: el DTO `CitaDetalle` (antes solo de `gestion/`) se movió
+      a `comun/dto/`, porque ahora lo comparten dos rutas con distinto
+      criterio de enmascarado
 
 **Aceptación:** no permite marcar estado en una cita cancelada.
+
+> **Pendiente:** abrir el PR contra `main` y que lo revise alguien de la otra
+> pareja (Andrés o Johan), como manda la regla de revisión cruzada.
 
 ---
 
