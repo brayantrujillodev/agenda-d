@@ -58,7 +58,7 @@ docker compose --profile core up -d --build   # + agenda-service
 curl localhost:8081/actuator/health           # -> {"status":"UP"}
 ```
 
-Swagger: http://localhost:8081/swagger-ui.html
+Swagger: <http://localhost:8081/swagger-ui.html>
 
 ## Migración
 

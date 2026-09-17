@@ -98,7 +98,7 @@ celular, domingo cerrado. No sustituye probarlo en el navegador.
 
 ## Flujo
 
-```
+```text
 #/  (paso 1)            elegir servicio  → Continuar
 #/reservar  (paso 2)    elegir día y cupo  → Continuar
 #/datos  (paso 3)       nombre + celular  →  POST /citas
