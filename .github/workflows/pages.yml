@@ -1,0 +1,43 @@
+# =====================================================================
+# pages · publica web/ (la PWA) en GitHub Pages
+#
+# No requiere servidor ni cuenta externa: solo activar Pages una vez en
+# Settings → Pages → Source: "GitHub Actions". Mientras web/config.js
+# tenga useMock: true, la PWA funciona sola con los datos de ejemplo del
+# contrato; cuando agenda-service tenga host público, cambia esa línea.
+# =====================================================================
+
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

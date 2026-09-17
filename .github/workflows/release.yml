@@ -1,0 +1,103 @@
+# =====================================================================
+# release · publica imágenes Docker y crea el GitHub Release
+#
+# Se dispara al empujar un tag "vX.Y.Z". Construye y publica en GHCR
+# solo los servicios que ya existen como proyecto (agenda-service y
+# notificaciones-service). gateway-graphql y analitica-service no están
+# construidos todavía (ver README "Estado actual"): no se referencian
+# aquí a propósito.
+#
+# El despliegue por SSH es opcional y queda apagado hasta que el equipo
+# tenga un servidor: solo corre si la variable de repo DEPLOY_ENABLED
+# vale "true" (Settings → Secrets and variables → Actions → Variables).
+# =====================================================================
+
+name: release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publicar-imagenes:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        servicio: [agenda-service, notificaciones-service]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Iniciar sesión en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar ${{ matrix.servicio }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.servicio }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.servicio }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.servicio }}:latest
+
+  crear-release:
+    needs: publicar-imagenes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Crear GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --notes "Imágenes: ghcr.io/${{ github.repository }}/{agenda-service,notificaciones-service}:${{ github.ref_name }}
+
+          Alcance de este release (ver README \"Estado actual\"): agenda-service +
+          notificaciones-service + PWA. gateway-graphql y analitica-service
+          todavía no existen como proyecto — el circuito de Fase 2
+          (panelRecepcion por GraphQL) sigue sin cerrarse."
+
+  desplegar:
+    needs: crear-release
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copiar docker-compose.prod.yml al servidor
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "docker-compose.prod.yml,db/**"
+          target: "~/agenda-d"
+
+      - name: docker compose pull && up -d
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/agenda-d
+            export TAG="${{ github.ref_name }}"
+            export GHCR_REPO="${{ env.REGISTRY }}/${{ github.repository }}"
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
