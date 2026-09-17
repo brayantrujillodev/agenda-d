@@ -22,8 +22,11 @@ El sistema opera como si el usuario ya estuviera autenticado.
 ## Estado actual
 
 **Fase 2 en curso.** El circuito REST → persistencia → outbox → Kafka →
-consumidor está cerrado y probado de punta a punta con Docker real; falta el
-gateway GraphQL para completar la Fase 2.
+consumidor está cerrado y probado de punta a punta con Docker real. Con
+`GET /v1/agenda/{profesionalId}` ya mergeado ([#20](../../pull/20)), solo
+falta el gateway GraphQL ([PR #14](../../pull/14), en curso) para que
+`panelRecepcion` deje de mostrar datos de ejemplo y cierre la Fase 2. Detalle
+de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
 
 | Componente | Estado |
 |---|---|
@@ -31,28 +34,23 @@ gateway GraphQL para completar la Fase 2.
 | Kafka en KRaft y su consola | ✅ funciona |
 | Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
-| `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11)). Falta `GET /v1/agenda/{profesionalId}` (ver [issue #1](../../issues/1)) |
+| `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
 | `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
 | `gateway-graphql` | 🔶 en curso — [PR #14](../../pull/14) |
 | `analitica-service` | ⬜ por construir |
-| PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#18](../../pull/18), [#19](../../pull/19)) |
+| PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
 
-> **Avance · 2026-09-14.** Con #6/#7/#10/#11 mergeados, `agenda-service`
-> cubre todo lo público y de gestión. Se encontró y arregló un bloqueo real:
-> sin CORS ([#17](../../pull/17)) el navegador rechazaba toda llamada de la
-> PWA aunque curl funcionara bien. Verificado en Chrome real (no mock, no
-> curl) contra Postgres + Kafka + `agenda-service` reales: reservar,
-> idempotencia, el `409` con alternativas, gestión y cancelación — 0 errores
-> de consola, outbox publicando los dos eventos. Sigue sin existir una vista
-> administrativa de reservas: sin `GET /v1/agenda/{profesionalId}`, el
-> `panelRecepcion` del gateway cae a datos de ejemplo (ver issue #1).
-
-> **Avance · 2026-08-28.** Repo publicado con `.gitignore`, licencia MIT,
-> contratos, migración y `docker-compose`. `agenda-service` arrancado en dos
-> PRs apilados: #6 (esqueleto Spring Boot 3.3 que arranca y aplica la
-> migración) y #7 (entidades del esquema `agenda` + `GET /v1/publico/{slug}/servicios`
-> y `GET /v1/publico/{slug}/disponibilidad`). Ningún PR mergeado todavía y el
-> `docker compose --profile core` aún no se ha verificado de punta a punta.
+> **Avance · 2026-09-14.** Con #6/#7/#10/#11/#20 mergeados, `agenda-service`
+> cubre todo lo público, de gestión y la vista administrativa
+> (`GET /v1/agenda/{profesionalId}` + registro de asistencia). Se encontró y
+> arregló un bloqueo real: sin CORS ([#17](../../pull/17)) el navegador
+> rechazaba toda llamada de la PWA aunque curl funcionara bien. Verificado en
+> Chrome real (no mock, no curl) contra Postgres + Kafka + `agenda-service`
+> reales: reservar, idempotencia, el `409` con alternativas, gestión y
+> cancelación — 0 errores de consola, outbox publicando los dos eventos.
+> Con la agenda del profesional ya mergeada, lo único que falta para cerrar
+> la Fase 2 es que el gateway GraphQL ([PR #14](../../pull/14)) consuma ese
+> endpoint en vez de datos de ejemplo.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -171,24 +169,25 @@ correctas pero van después. El plan está ordenado según eso.
 
 Capacidad real: ~20 horas semanales entre los cuatro.
 
-### Fase 1 · Semanas 1–5 · Cimientos
+### Fase 1 · Semanas 1–5 · Cimientos — ✅ cerrada
 
 - [x] Contratos OpenAPI, GraphQL y de eventos en el repo (`docs/`)
 - [x] Migración con el `EXCLUDE` en el repo (`db/V1__esquema_inicial.sql`)
-- [ ] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service` → PR [#6](../../pull/6)
-- [ ] `docker compose --profile core up` levanta agenda-service con `/actuator/health` → PR [#6](../../pull/6)
-- [ ] `agenda-service` consulta cupos → PR [#7](../../pull/7) · reserva contra la BD real → rama 3 (pendiente)
+- [x] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service`
+- [x] `docker compose --profile core up` levanta agenda-service con `/actuator/health`
+- [x] `agenda-service` consulta cupos y reserva contra la BD real
 
-### Fase 2 · Semanas 6–10 · Flujo mínimo completo
+### Fase 2 · Semanas 6–10 · Flujo mínimo completo — 🔶 en curso
 
 **El hito del semestre.** Al cerrarlo, el sistema recorre el circuito entero.
 
-- [ ] Outbox publicando `citas.reservadas`
-- [ ] `notificaciones-service` consumiendo y guardando el mensaje
-- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion`
-- [ ] PWA pública de reserva contra la API real
+- [x] Outbox publicando `citas.reservadas`
+- [x] `notificaciones-service` consumiendo y guardando el mensaje
+- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion` — **sin empezar, es lo que falta cerrar**
+- [ ] PWA pública de reserva contra la API real — UI lista, conexión al backend real en rama sin mergear
 
 Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
+Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
 
 ### Fase 3 · Semanas 11–15 · Robustez
 

@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -68,6 +69,13 @@ public class ManejadorErrores {
     public RespuestaError parametros(Exception e) {
         return new RespuestaError("DATOS_INVALIDOS",
                 "Revisa los parámetros de la consulta: falta alguno o tiene un formato inválido.");
+    }
+
+    /** Rutas administrativas: falta la cabecera {@code X-Negocio-Id} que identifica el negocio. */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public RespuestaError faltaCabecera(MissingRequestHeaderException e) {
+        return new RespuestaError("DATOS_INVALIDOS", "Falta la cabecera " + e.getHeaderName() + ".");
     }
 
     @ExceptionHandler(DateTimeException.class)
