@@ -13,9 +13,9 @@
 window.CONFIG = {
   // true  -> usa el backend simulado de mock.js (datos del contrato)
   // false -> pega contra agenda-service de verdad
-  useMock: true,
+  useMock: false,
 
-  // Base de la API REST de agenda-service.
+  // Base de la API REST de agenda-service (PR #6/#7/#10/#11, mergeados a main).
   // CLAUDE.md y docs/CONSTRUCCION.md (paso 2) exponen agenda-service en :8081.
   // El OpenAPI declara servers: http://localhost:8080 -> discrepancia del
   // contrato pendiente de aclarar con el equipo. Si el backend queda en 8080,

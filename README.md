@@ -21,10 +21,9 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 1 en curso.** Hoy funciona la infraestructura y los contratos están
-versionados en el repo. `agenda-service` ya tiene proyecto y se construye por
-partes; los demás servicios aún no tienen proyecto. El Compose deja todo
-definido, pero solo el perfil `infra` levanta sin errores.
+**Fase 2 en curso.** El circuito REST → persistencia → outbox → Kafka →
+consumidor está cerrado y probado de punta a punta con Docker real; falta el
+gateway GraphQL para completar la Fase 2.
 
 | Componente | Estado |
 |---|---|
@@ -32,11 +31,21 @@ definido, pero solo el perfil `infra` levanta sin errores.
 | Kafka en KRaft y su consola | ✅ funciona |
 | Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
-| `agenda-service` | 🔶 en curso — [PR #6](../../pull/6) esqueleto, [PR #7](../../pull/7) entidades + disponibilidad (en revisión) |
-| `notificaciones-service` | ⬜ por construir |
-| `gateway-graphql` | ⬜ por construir |
+| `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11)). Falta `GET /v1/agenda/{profesionalId}` (ver [issue #1](../../issues/1)) |
+| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
+| `gateway-graphql` | 🔶 en curso — [PR #14](../../pull/14) |
 | `analitica-service` | ⬜ por construir |
-| PWA de reserva | 🟡 flujo completo contra datos de ejemplo (`web/`); falta apuntarla a `agenda-service` |
+| PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#18](../../pull/18), [#19](../../pull/19)) |
+
+> **Avance · 2026-09-14.** Con #6/#7/#10/#11 mergeados, `agenda-service`
+> cubre todo lo público y de gestión. Se encontró y arregló un bloqueo real:
+> sin CORS ([#17](../../pull/17)) el navegador rechazaba toda llamada de la
+> PWA aunque curl funcionara bien. Verificado en Chrome real (no mock, no
+> curl) contra Postgres + Kafka + `agenda-service` reales: reservar,
+> idempotencia, el `409` con alternativas, gestión y cancelación — 0 errores
+> de consola, outbox publicando los dos eventos. Sigue sin existir una vista
+> administrativa de reservas: sin `GET /v1/agenda/{profesionalId}`, el
+> `panelRecepcion` del gateway cae a datos de ejemplo (ver issue #1).
 
 > **Avance · 2026-08-28.** Repo publicado con `.gitignore`, licencia MIT,
 > contratos, migración y `docker-compose`. `agenda-service` arrancado en dos
@@ -75,15 +84,15 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
 **Perfiles.** `infra` levanta base de datos, Kafka y la consola. `core` añade
-`agenda-service` y `full` añade el resto — esos dos empezarán a funcionar a
-medida que existan los proyectos con su `pom.xml` y su `Dockerfile`.
+`agenda-service` (ya funciona) y `full` añade el resto — `gateway-graphql` y
+`analitica-service` empezarán a funcionar a medida que existan sus proyectos.
 
 | Servicio | URL | Estado |
 |---|---|---|
 | PostgreSQL | localhost:5432 · `agendad`/`agendad` | activo |
 | Kafka desde el equipo | localhost:29092 | activo |
 | Consola de Kafka | <http://localhost:8090> | activo |
-| agenda-service | <http://localhost:8081> | por construir |
+| agenda-service | <http://localhost:8081> | activo |
 | gateway GraphQL | <http://localhost:8080/graphiql> | por construir |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
