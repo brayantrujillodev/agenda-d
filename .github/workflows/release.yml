@@ -60,16 +60,20 @@ jobs:
       - name: Crear GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
-            --generate-notes \
-            --notes "Imágenes: ghcr.io/${{ github.repository }}/{agenda-service,notificaciones-service}:${{ github.ref_name }}
+          cat > /tmp/notas.md <<EOF
+          Imágenes: ghcr.io/${REPO}/{agenda-service,notificaciones-service}:${TAG}
 
-          Alcance de este release (ver README \"Estado actual\"): agenda-service +
-          notificaciones-service + PWA. gateway-graphql y analitica-service
-          todavía no existen como proyecto — el circuito de Fase 2
-          (panelRecepcion por GraphQL) sigue sin cerrarse."
+          Alcance de este release (ver README "Estado actual"):
+          agenda-service + notificaciones-service + PWA.
+          gateway-graphql y analitica-service todavía no existen como
+          proyecto — el circuito de Fase 2 (panelRecepcion por GraphQL)
+          sigue sin cerrarse.
+          EOF
+          gh release create "$TAG" --title "$TAG" --generate-notes \
+            --notes-file /tmp/notas.md
 
   desplegar:
     needs: crear-release
