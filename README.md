@@ -21,11 +21,12 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 1 cerrada. Fase 2 (flujo mínimo) casi cerrada — falta `gateway-graphql`.**
-`agenda-service` reserva contra la base real, publica por outbox y
-`notificaciones-service` ya consume. El único tramo del circuito que falta
-por completo es el gateway GraphQL. Detalle de tareas y dueños en
-[`docs/TAREAS.md`](docs/TAREAS.md).
+**Fase 2 en curso.** El circuito REST → persistencia → outbox → Kafka →
+consumidor está cerrado y probado de punta a punta con Docker real. Con
+`GET /v1/agenda/{profesionalId}` ya mergeado ([#20](../../pull/20)), solo
+falta el gateway GraphQL ([PR #14](../../pull/14), en curso) para que
+`panelRecepcion` deje de mostrar datos de ejemplo y cierre la Fase 2. Detalle
+de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
 
 | Componente | Estado |
 |---|---|
@@ -33,17 +34,23 @@ por completo es el gateway GraphQL. Detalle de tareas y dueños en
 | Kafka en KRaft y su consola | ✅ funciona |
 | Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
-| `agenda-service` | ✅ disponibilidad, reserva con outbox, gestión por token · 🟢 falta `GET /v1/agenda/{profesionalId}` (fuera del circuito mínimo) |
-| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas` · ⚠️ rama pendiente sube a Java 25, no mergear así (CLAUDE.md exige Java 21) |
-| `gateway-graphql` | ⬜ por construir — **es el hueco que falta para cerrar Fase 2** |
-| `analitica-service` | ⬜ por construir (Fase 3, no es momento aún) |
-| PWA de reserva | 🟡 UI completa (`web/`) contra backend real pendiente de merge — CORS y conexión ya resueltos en ramas sin mergear |
+| `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
+| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
+| `gateway-graphql` | 🔶 en curso — [PR #14](../../pull/14) |
+| `analitica-service` | ⬜ por construir |
+| PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
 
-> **Avance · 2026-09-14.** Fase 1 completa. Fase 2: reserva + outbox +
-> notificaciones + PWA (UI) mergeados a `main`. Pendiente de merge: CORS y
-> conexión de la PWA al backend real. Sin empezar: `gateway-graphql` con
-> `panelRecepcion`, que es lo único que falta para que el circuito
-> REST → Kafka → consumidor → GraphQL cierre de punta a punta.
+> **Avance · 2026-09-14.** Con #6/#7/#10/#11/#20 mergeados, `agenda-service`
+> cubre todo lo público, de gestión y la vista administrativa
+> (`GET /v1/agenda/{profesionalId}` + registro de asistencia). Se encontró y
+> arregló un bloqueo real: sin CORS ([#17](../../pull/17)) el navegador
+> rechazaba toda llamada de la PWA aunque curl funcionara bien. Verificado en
+> Chrome real (no mock, no curl) contra Postgres + Kafka + `agenda-service`
+> reales: reservar, idempotencia, el `409` con alternativas, gestión y
+> cancelación — 0 errores de consola, outbox publicando los dos eventos.
+> Con la agenda del profesional ya mergeada, lo único que falta para cerrar
+> la Fase 2 es que el gateway GraphQL ([PR #14](../../pull/14)) consuma ese
+> endpoint en vez de datos de ejemplo.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -75,15 +82,15 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
 **Perfiles.** `infra` levanta base de datos, Kafka y la consola. `core` añade
-`agenda-service` y `full` añade el resto — esos dos empezarán a funcionar a
-medida que existan los proyectos con su `pom.xml` y su `Dockerfile`.
+`agenda-service` (ya funciona) y `full` añade el resto — `gateway-graphql` y
+`analitica-service` empezarán a funcionar a medida que existan sus proyectos.
 
 | Servicio | URL | Estado |
 |---|---|---|
 | PostgreSQL | localhost:5432 · `agendad`/`agendad` | activo |
 | Kafka desde el equipo | localhost:29092 | activo |
 | Consola de Kafka | <http://localhost:8090> | activo |
-| agenda-service | <http://localhost:8081> | por construir |
+| agenda-service | <http://localhost:8081> | activo |
 | gateway GraphQL | <http://localhost:8080/graphiql> | por construir |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.

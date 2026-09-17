@@ -13,7 +13,7 @@
   --crema: #f4f2ec;
   --superficie: #ffffff;
   --texto: #2b2a26;
-  --texto-suave: #85847a;
+  --texto-suave: #6b6a60;   /* 4.5:1+ sobre --crema y --superficie (WCAG AA) */
   --borde: #e6e2d7;
   --peligro: #b23b3b;
 
@@ -589,6 +589,45 @@ input[type="date"].campo__control { display: block; min-height: 48px; }
 @media (prefers-color-scheme: dark) {
   .banner--offline { background: #3a2e12; color: #f0d9a4; }
 }
+
+.banner--instalar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: var(--verde-tenue);
+  color: var(--verde);
+}
+
+@media (prefers-color-scheme: dark) { .banner--instalar { color: #cfe6d8; } }
+
+.banner--instalar span { flex: 1; min-width: 0; }
+
+.banner__boton {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--verde);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.banner__cerrar {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: inherit;
+  opacity: .7;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.banner__cerrar:hover { opacity: 1; }
 
 /* ---------- Error ---------- */
 
