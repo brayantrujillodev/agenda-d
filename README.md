@@ -103,6 +103,32 @@ docker compose --profile full down -v
 
 ---
 
+## Despliegue
+
+GitHub Actions publica dos cosas por separado — ninguna necesita más cuenta
+que GitHub:
+
+- **`web/` → GitHub Pages**, automático en cada push a `main` que toque esa
+  carpeta ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)).
+  Solo hay que activar Pages una vez en *Settings → Pages → Source: GitHub
+  Actions*. Mientras `web/config.js` tenga `useMock`, sirve para mostrar el
+  flujo de reserva sin backend.
+- **Imágenes de `agenda-service` y `notificaciones-service` → GHCR**, al
+  empujar un tag `vX.Y.Z`
+  ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Crea
+  además el GitHub Release con las notas. `gateway-graphql` y
+  `analitica-service` no se publican todavía: no existen como proyecto (ver
+  «Estado actual»).
+
+El despliegue del backend en un servidor (`docker-compose.prod.yml`, ya con
+Postgres real) queda listo pero apagado hasta tener dónde correrlo: se activa
+solo con la variable de repo `DEPLOY_ENABLED=true` y los secrets
+`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (*Settings → Secrets and
+variables → Actions*). Sin esos tres secrets el job de despliegue se salta
+solo, no falla.
+
+---
+
 ## Estructura
 
 ```text

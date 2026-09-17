@@ -5,6 +5,7 @@ y deja constancia del aviso en `notificaciones.programacion`, sin enviarlo
 por ningún canal real todavía (adaptador `REGISTRO`).
 
 **Alcance de esta versión (issue #10, Fase 2):**
+
 - [x] Consume `citas.reservadas` y `citas.canceladas`
 - [x] Deduplica por `eventoId` contra `notificaciones.evento_procesado`
 - [x] Interfaz `CanalNotificacion` con la implementación `RegistroCanal`

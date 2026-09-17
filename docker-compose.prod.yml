@@ -1,0 +1,115 @@
+# =====================================================================
+# AGENDA-D · Despliegue en el servidor (VM propia o VPS gratuito)
+#
+# A diferencia de docker-compose.yml (que compila cada servicio con
+# `build:` para desarrollo), este archivo usa las imágenes ya publicadas
+# en GHCR por .github/workflows/release.yml. No incluye gateway-graphql
+# ni analitica-service: todavía no existen como proyecto (ver README).
+#
+# Uso en el servidor:
+#   export GHCR_REPO=ghcr.io/<owner>/<repo>
+#   export TAG=v1.0.0
+#   docker compose -f docker-compose.prod.yml up -d
+# =====================================================================
+
+name: agenda-d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agd-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agendad
+      POSTGRES_USER: agendad
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agendad}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agendad -d agendad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  kafka:
+    image: bitnamilegacy/kafka:3.7
+    container_name: agd-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "controller,broker"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_NUM_PARTITIONS: "3"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafkadata:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 1g
+    networks: [agenda-net]
+
+  agenda-service:
+    image: ${GHCR_REPO}/agenda-service:${TAG:-latest}
+    container_name: agd-agenda
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
+      SPRING_DATASOURCE_USERNAME: agendad
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-agendad}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  notificaciones-service:
+    image: ${GHCR_REPO}/notificaciones-service:${TAG:-latest}
+    container_name: agd-notificaciones
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
+      SPRING_DATASOURCE_USERNAME: agendad
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-agendad}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AGENDAD_CANAL_POR_DEFECTO: REGISTRO
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    mem_limit: 512m
+    networks: [agenda-net]
+
+volumes:
+  pgdata:
+  kafkadata:
+
+networks:
+  agenda-net:
+    driver: bridge
