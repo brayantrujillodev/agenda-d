@@ -1,0 +1,6 @@
+type Query { panelRecepcion(negocioId: ID!, fecha: String): PanelRecepcion! }
+type PanelRecepcion { fecha: String!, negocio: Negocio!, citasDelDia: [Cita!]!, metricasDelMes: Metricas! }
+type Negocio { id: ID!, nombre: String!, slugPublico: String!, zonaHoraria: String!, servicios: [Servicio!]! }
+type Servicio { id: ID!, nombre: String!, duracionMin: Int!, precio: Float!, activo: Boolean! }
+type Cita { id: ID!, inicio: String!, fin: String!, estado: String!, clienteNombre: String!, clienteCelular: String!, servicioNombre: String!, profesionalNombre: String! }
+type Metricas { desde: String!, hasta: String!, totalCitas: Int!, atendidas: Int!, noAsistio: Int!, canceladas: Int!, ocupacion: Float!, tasaInasistencia: Float! }

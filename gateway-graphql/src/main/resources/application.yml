@@ -1,0 +1,8 @@
+server.port: 8080
+spring:
+  application.name: gateway-graphql
+  graphql.graphiql.enabled: true
+agendad:
+  agenda-url: ${AGENDAD_AGENDA_URL:http://localhost:8081}
+  analitica-url: ${AGENDAD_ANALITICA_URL:http://localhost:8083}
+management.endpoints.web.exposure.include: health,info

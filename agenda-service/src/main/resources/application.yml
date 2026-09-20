@@ -1,0 +1,10 @@
+server:
+  port: 8081
+spring:
+  application.name: agenda-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agendad}
+    username: ${SPRING_DATASOURCE_USERNAME:agendad}
+    password: ${SPRING_DATASOURCE_PASSWORD:agendad}
+  kafka.bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+management.endpoints.web.exposure.include: health,info

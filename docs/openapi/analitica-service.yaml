@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info:
+  title: AGENDA-D · analitica-service
+  version: 1.0.0
+  description: Proyección de lectura creada a partir de eventos Kafka; no acepta escrituras REST.
+servers:
+  - url: http://localhost:8083
+paths:
+  /v1/metricas:
+    get:
+      summary: Indicadores consolidados del negocio
+      parameters:
+        - name: X-Negocio-Id
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+        - name: desde
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: hasta
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Métricas del periodo

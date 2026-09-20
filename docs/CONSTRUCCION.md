@@ -156,7 +156,7 @@ Consulta de prueba:
 
 ```graphql
 {
-  panelRecepcion(fecha: "2026-09-01") {
+  panelRecepcion(negocioId: "11111111-1111-1111-1111-111111111111", fecha: "2026-09-01") {
     citasDelDia { horaLocal clienteNombre servicio { nombre } }
     negocio { nombre servicios { nombre precio } }
   }

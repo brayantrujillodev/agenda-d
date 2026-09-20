@@ -133,7 +133,7 @@ type Query {
   Pantalla completa del panel en una sola consulta.
   Es la razón de existir del gateway.
   """
-  panelRecepcion(fecha: Date): PanelRecepcion!
+  panelRecepcion(negocioId: ID!, fecha: Date): PanelRecepcion!
 
   "Configuración del negocio en contexto (cabecera X-Negocio-Id)."
   negocio: Negocio!

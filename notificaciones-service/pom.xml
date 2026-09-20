@@ -13,7 +13,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.16</version>
+        <version>3.3.12</version>
         <relativePath/>
     </parent>
 
@@ -28,7 +28,8 @@
     </description>
 
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <postgresql.version>42.7.12</postgresql.version>
         <byte-buddy.version>1.18.13</byte-buddy.version>
     </properties>
@@ -68,6 +69,10 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <licenses>
+        <license><name>MIT License</name><url>https://opensource.org/license/mit</url><distribution>repo</distribution></license>
+    </licenses>
 
     <build>
         <plugins>

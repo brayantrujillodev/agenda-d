@@ -1,0 +1,20 @@
+openapi: 3.0.3
+info:
+  title: AGENDA-D · contrato interno de agenda
+  version: 1.0.0
+  description: Contrato REST exclusivo entre gateway-graphql y agenda-service. No se expone al cliente público.
+paths:
+  /v1/interno/panel:
+    get:
+      summary: Datos de agenda y configuración para componer el panel GraphQL
+      parameters:
+        - name: negocioId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: fecha
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: Negocio, servicios y citas de la fecha }

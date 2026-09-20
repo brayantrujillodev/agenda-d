@@ -12,7 +12,7 @@ info:
     - Ruta administrativa: el negocio viaja en la cabecera `X-Negocio-Id`.
 
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8081
     description: Local vía Docker Compose
 
 tags:

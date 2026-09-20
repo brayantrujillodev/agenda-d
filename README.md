@@ -1,5 +1,10 @@
 # AGENDA-D
 
+> Estado de integración: los servicios `agenda`, `notificaciones`,
+> `analitica`, el gateway GraphQL y la PWA ya tienen módulos construibles.
+> Consulta `docs/ESTADO-IMPLEMENTACION.md` para rutas, contratos y límites
+> actuales. La validación de ejecución requiere Docker Desktop activo.
+
 Plataforma distribuida de agendamiento de citas para negocios de servicios.
 Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
 

@@ -142,6 +142,11 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka:    { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     mem_limit: 512m
     networks: [agenda-net]
 
@@ -157,6 +162,12 @@ services:
       - "8080:8080"          # el panel de recepción consume esto
     depends_on:
       agenda-service: { condition: service_healthy }
+      analitica-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     mem_limit: 512m
     networks: [agenda-net]
 
@@ -173,7 +184,23 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka:    { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     mem_limit: 512m
+    networks: [agenda-net]
+
+  web:
+    build: ./web
+    container_name: agd-web
+    profiles: [full]
+    ports:
+      - "8084:80"
+    depends_on:
+      agenda-service: { condition: service_healthy }
+    mem_limit: 128m
     networks: [agenda-net]
 
 volumes:

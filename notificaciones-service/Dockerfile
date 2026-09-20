@@ -2,7 +2,7 @@
 # notificaciones-service · build multi-stage
 # =====================================================================
 
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
 # Capa de dependencias separada del código: si solo cambia src/, esta
@@ -15,7 +15,7 @@ RUN mvn -B -q clean package -DskipTests
 
 # ---------------------------------------------------------------------
 
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 COPY --from=build /build/target/*.jar app.jar
