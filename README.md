@@ -23,10 +23,10 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 **Fase 2 en curso.** El circuito REST → persistencia → outbox → Kafka →
 consumidor está cerrado y probado de punta a punta con Docker real. Con
-`GET /v1/agenda/{profesionalId}` ya mergeado ([#20](../../pull/20)), solo
-falta el gateway GraphQL ([PR #14](../../pull/14), en curso) para que
-`panelRecepcion` deje de mostrar datos de ejemplo y cierre la Fase 2. Detalle
-de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
+`GET /v1/agenda/{profesionalId}` ([#20](../../pull/20)) y el gateway GraphQL
+([#14](../../pull/14)) ya mergeados, `panelRecepcion` consume `agenda-service`
+real y la Fase 2 queda cerrada. Detalle de tareas y dueños en
+[`docs/TAREAS.md`](docs/TAREAS.md).
 
 | Componente | Estado |
 |---|---|
@@ -36,21 +36,17 @@ de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
 | `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
 | `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
-| `gateway-graphql` | 🔶 en curso — [PR #14](../../pull/14) |
+| `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, con fallback a datos de ejemplo si el backend no responde ([#14](../../pull/14)) |
 | `analitica-service` | ⬜ por construir |
 | PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
 
-> **Avance · 2026-09-14.** Con #6/#7/#10/#11/#20 mergeados, `agenda-service`
-> cubre todo lo público, de gestión y la vista administrativa
-> (`GET /v1/agenda/{profesionalId}` + registro de asistencia). Se encontró y
-> arregló un bloqueo real: sin CORS ([#17](../../pull/17)) el navegador
-> rechazaba toda llamada de la PWA aunque curl funcionara bien. Verificado en
-> Chrome real (no mock, no curl) contra Postgres + Kafka + `agenda-service`
-> reales: reservar, idempotencia, el `409` con alternativas, gestión y
-> cancelación — 0 errores de consola, outbox publicando los dos eventos.
-> Con la agenda del profesional ya mergeada, lo único que falta para cerrar
-> la Fase 2 es que el gateway GraphQL ([PR #14](../../pull/14)) consuma ese
-> endpoint en vez de datos de ejemplo.
+> **Avance · 2026-09-23.** Con el gateway GraphQL ([#14](../../pull/14))
+> mergeado, se cierra el circuito completo de la Fase 2: REST → persistencia
+> → outbox → Kafka → `notificaciones-service` consumiendo → gateway GraphQL
+> respondiendo `panelRecepcion` con datos reales de `agenda-service`, más la
+> PWA pública. Queda pendiente para Fase 3: `analitica-service`, DLQ y
+> reintentos, Testcontainers con la prueba de concurrencia, y el recordatorio
+> de 24 h con recuperación tras reinicio.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -91,7 +87,7 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 | Kafka desde el equipo | localhost:29092 | activo |
 | Consola de Kafka | <http://localhost:8090> | activo |
 | agenda-service | <http://localhost:8081> | activo |
-| gateway GraphQL | <http://localhost:8080/graphiql> | por construir |
+| gateway GraphQL | <http://localhost:8080/graphiql> | activo |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
 
