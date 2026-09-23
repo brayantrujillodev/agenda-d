@@ -5,6 +5,8 @@ import com.agendad.gateway.model.HorarioAtencion;
 import com.agendad.gateway.model.Negocio;
 import com.agendad.gateway.model.Profesional;
 import com.agendad.gateway.model.Servicio;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,8 @@ import java.util.UUID;
 
 @Service
 public class AgendaClient {
+
+    private static final Logger log = LoggerFactory.getLogger(AgendaClient.class);
 
     private static final String SERVICIO_CORTE_ID = "22222222-2222-2222-2222-222222222222";
     private static final String SERVICIO_BARBA_ID = "22222222-2222-2222-2222-222222222223";
@@ -50,8 +54,8 @@ public class AgendaClient {
             if (response != null && !response.isEmpty()) {
                 return response.stream().map(this::toServicio).toList();
             }
-        } catch (RestClientException ignored) {
-            // El contrato permite desarrollar el gateway antes que agenda-service.
+        } catch (RestClientException e) {
+            log.warn("No se pudo consultar servicios en agenda-service, usando datos de ejemplo: {}", e.getMessage());
         }
         return serviciosDeEjemplo();
     }
@@ -59,18 +63,16 @@ public class AgendaClient {
     public List<Cita> citas(LocalDate fecha, List<Servicio> servicios) {
         try {
             List<CitaResponse> response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path(agendaUrl + "/v1/agenda/{profesionalId}")
-                            .queryParam("fecha", fecha)
-                            .build(profesionalId))
+                    .uri(agendaUrl + "/v1/agenda/{profesionalId}?fecha={fecha}", profesionalId, fecha)
                     .header("X-Negocio-Id", negocioId)
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {});
             if (response != null) {
                 return response.stream().map(item -> toCita(item, servicios)).toList();
             }
-        } catch (RestClientException ignored) {
-            // El contrato permite desarrollar el gateway antes que agenda-service.
+        } catch (RestClientException e) {
+            log.warn("No se pudo consultar la agenda de {} en agenda-service, usando datos de ejemplo: {}",
+                    profesionalId, e.getMessage());
         }
         return citasDeEjemplo(fecha, servicios);
     }
