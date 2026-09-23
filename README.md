@@ -21,12 +21,12 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 2 en curso.** El circuito REST → persistencia → outbox → Kafka →
-consumidor está cerrado y probado de punta a punta con Docker real. Con
-`GET /v1/agenda/{profesionalId}` ([#20](../../pull/20)) y el gateway GraphQL
-([#14](../../pull/14)) ya mergeados, `panelRecepcion` consume `agenda-service`
-real y la Fase 2 queda cerrada. Detalle de tareas y dueños en
-[`docs/TAREAS.md`](docs/TAREAS.md).
+**Fase 2 cerrada.** El circuito REST → persistencia → outbox → Kafka →
+`notificaciones-service` → gateway GraphQL (`panelRecepcion`) está cerrado y
+**verificado a mano contra Docker real**: los seis contenedores arriba,
+una cita reservada por `POST /v1/publico/{slug}/citas` y confirmada tal
+cual en la respuesta de `panelRecepcion` — no son datos de ejemplo.
+Detalle de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
 
 | Componente | Estado |
 |---|---|
@@ -36,17 +36,27 @@ real y la Fase 2 queda cerrada. Detalle de tareas y dueños en
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
 | `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
 | `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
-| `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, con fallback a datos de ejemplo si el backend no responde ([#14](../../pull/14)) |
+| `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, verificado con una reserva real de punta a punta ([#14](../../pull/14), fix de URI en [#23](../../pull/23)) |
 | `analitica-service` | ⬜ por construir |
 | PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
 
-> **Avance · 2026-09-23.** Con el gateway GraphQL ([#14](../../pull/14))
-> mergeado, se cierra el circuito completo de la Fase 2: REST → persistencia
-> → outbox → Kafka → `notificaciones-service` consumiendo → gateway GraphQL
-> respondiendo `panelRecepcion` con datos reales de `agenda-service`, más la
-> PWA pública. Queda pendiente para Fase 3: `analitica-service`, DLQ y
-> reintentos, Testcontainers con la prueba de concurrencia, y el recordatorio
-> de 24 h con recuperación tras reinicio.
+**Release publicado:** [`v1.0.2`](../../releases/tag/v1.0.2) — imágenes de
+`agenda-service`, `notificaciones-service` y `gateway-graphql` en GHCR.
+(`v1.0.1` quedó publicado con un bug real en `gateway-graphql` que hacía que
+`panelRecepcion` siempre devolviera datos de ejemplo aunque el backend
+respondiera bien — no usar esa versión, se deja el tag por trazabilidad.)
+
+> **Avance · 2026-09-23.** Con Docker instalado y los seis contenedores
+> arriba (`--profile core` + `gateway-graphql` + `notificaciones-service`),
+> se probó el circuito completo a mano: reservar una cita real por REST y
+> verla aparecer en `panelRecepcion` vía GraphQL. Esa prueba encontró un bug
+> real — `AgendaClient` armaba mal la URI de `/v1/agenda/{id}` y el
+> `RestClientException` quedaba silenciado, así que el gateway **nunca**
+> había leído la agenda real, ni en el PR #14 ni en el release `v1.0.1` —
+> corregido en [#23](../../pull/23) y republicado como `v1.0.2`. Queda
+> pendiente para Fase 3: `analitica-service`, DLQ y reintentos, Testcontainers
+> con la prueba de concurrencia, y el recordatorio de 24 h con recuperación
+> tras reinicio.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -56,8 +66,13 @@ real y la Fase 2 queda cerrada. Detalle de tareas y dueños en
 ```bash
 git clone <url> && cd agenda-d
 
-# Lo único que funciona hoy: base de datos + bus de eventos
-docker compose --profile infra up -d
+# Base de datos + bus de eventos + agenda-service
+docker compose --profile core up -d
+
+# Si además quieres el gateway GraphQL y notificaciones-service
+# (analitica-service todavía no tiene proyecto, así que --profile full falla
+# hasta que exista: mejor levantar estos dos servicios por nombre)
+docker compose up -d gateway-graphql notificaciones-service kafka-ui
 ```
 
 Con eso arriba puedes conectarte a la base y ver el esquema ya creado con sus
@@ -78,8 +93,11 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
 **Perfiles.** `infra` levanta base de datos, Kafka y la consola. `core` añade
-`agenda-service` (ya funciona) y `full` añade el resto — `gateway-graphql` y
-`analitica-service` empezarán a funcionar a medida que existan sus proyectos.
+`agenda-service`. `full` intenta levantar también `notificaciones-service`,
+`gateway-graphql` y `analitica-service`, pero **falla** porque
+`analitica-service` todavía no tiene `Dockerfile` (solo `.gitkeep`) — mientras
+tanto, levanta esos dos servicios por nombre en vez de `--profile full`:
+`docker compose up -d gateway-graphql notificaciones-service kafka-ui`.
 
 | Servicio | URL | Estado |
 |---|---|---|
@@ -105,16 +123,17 @@ GitHub Actions publica dos cosas por separado — ninguna necesita más cuenta
 que GitHub:
 
 - **`web/` → GitHub Pages**, automático en cada push a `main` que toque esa
-  carpeta ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)).
-  Solo hay que activar Pages una vez en *Settings → Pages → Source: GitHub
-  Actions*. Mientras `web/config.js` tenga `useMock`, sirve para mostrar el
-  flujo de reserva sin backend.
-- **Imágenes de `agenda-service` y `notificaciones-service` → GHCR**, al
-  empujar un tag `vX.Y.Z`
+  carpeta ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)), ya
+  activo en <https://brayantrujillodev.github.io/agenda-d/>.
+  `web/config.js` tiene hoy `useMock: false` y `apiBase: 'http://localhost:8081'`,
+  así que esa URL pública solo reserva contra un `agenda-service` que corra
+  en la máquina de quien la abre — no es un backend compartido. Para volver
+  a la demo sin backend, pon `useMock: true`.
+- **Imágenes de `agenda-service`, `notificaciones-service` y
+  `gateway-graphql` → GHCR**, al empujar un tag `vX.Y.Z`
   ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Crea
-  además el GitHub Release con las notas. `gateway-graphql` y
-  `analitica-service` no se publican todavía: no existen como proyecto (ver
-  «Estado actual»).
+  además el GitHub Release con las notas. `analitica-service` no se publica
+  todavía: no existe como proyecto (ver «Estado actual»).
 
 El despliegue del backend en un servidor (`docker-compose.prod.yml`, ya con
 Postgres real) queda listo pero apagado hasta tener dónde correrlo: se activa
@@ -199,14 +218,16 @@ Capacidad real: ~20 horas semanales entre los cuatro.
 - [x] `docker compose --profile core up` levanta agenda-service con `/actuator/health`
 - [x] `agenda-service` consulta cupos y reserva contra la BD real
 
-### Fase 2 · Semanas 6–10 · Flujo mínimo completo — 🔶 en curso
+### Fase 2 · Semanas 6–10 · Flujo mínimo completo — ✅ cerrada
 
-**El hito del semestre.** Al cerrarlo, el sistema recorre el circuito entero.
+**El hito del semestre.** El sistema recorre el circuito entero.
 
 - [x] Outbox publicando `citas.reservadas`
 - [x] `notificaciones-service` consumiendo y guardando el mensaje
-- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion` — **sin empezar, es lo que falta cerrar**
-- [ ] PWA pública de reserva contra la API real — UI lista, conexión al backend real en rama sin mergear
+- [x] `gateway-graphql` respondiendo la consulta `panelRecepcion` con datos
+      reales de `agenda-service` — verificado a mano contra Docker real
+      ([#14](../../pull/14), fix de bug real en [#23](../../pull/23))
+- [x] PWA pública de reserva contra la API real
 
 Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
 Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
