@@ -3,8 +3,8 @@
 #
 # A diferencia de docker-compose.yml (que compila cada servicio con
 # `build:` para desarrollo), este archivo usa las imágenes ya publicadas
-# en GHCR por .github/workflows/release.yml. No incluye gateway-graphql
-# ni analitica-service: todavía no existen como proyecto (ver README).
+# en GHCR por .github/workflows/release.yml. No incluye analitica-service:
+# todavía no existe como proyecto (ver README).
 #
 # Uso en el servidor:
 #   export GHCR_REPO=ghcr.io/<owner>/<repo>
@@ -103,6 +103,20 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  gateway-graphql:
+    image: ${GHCR_REPO}/gateway-graphql:${TAG:-latest}
+    container_name: agd-gateway
+    restart: unless-stopped
+    environment:
+      AGENDAD_AGENDA_URL: http://agenda-service:8081
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8080:8080"
+    depends_on:
+      agenda-service: { condition: service_healthy }
     mem_limit: 512m
     networks: [agenda-net]
 
