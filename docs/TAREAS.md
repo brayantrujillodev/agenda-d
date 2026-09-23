@@ -13,23 +13,29 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
-## Estado y próximos pasos · 2026-09-14
+## Estado y próximos pasos · 2026-09-23
 
-Fase 1 está cerrada de punta a punta. Fase 2 (el hito del semestre) tiene
-**un solo hueco bloqueante real: `gateway-graphql` no existe todavía.**
-Sin eso el circuito REST → Kafka → consumidor → GraphQL no cierra, aunque
-todo lo demás ya funcione.
+**Fase 2 cerrada de punta a punta.** Con el gateway GraphQL mergeado
+([PR #14](../../pull/14)), el circuito completo funciona: REST →
+persistencia → outbox → Kafka → `notificaciones-service` consumiendo →
+gateway GraphQL respondiendo `panelRecepcion` con datos reales de
+`agenda-service`, más la PWA pública instalable.
 
-| Quién | Qué tiene pendiente ahora mismo | Por qué es su turno |
+Luis y Johan no están contribuyendo activamente por ahora. El resto del
+equipo sigue con el backlog de Fase 3, reasignando lo que estaba en su
+cabeza si hace falta:
+
+| Quién | Qué tiene pendiente ahora mismo | Nota |
 |---|---|---|
-| **Luis** | Empezar `gateway-graphql`: esqueleto + resolver de `panelRecepcion` llamando a `agenda-service` por REST (#11) | Es el único issue 🔴 de Fase 2 sin arrancar. Bloquea el cierre del hito. |
-| **Andrés** | Abrir PR de `fix/agenda-service-cors` (ya probada) y de `feature/4-pwa-conectar-backend` (PWA contra el backend real, ya no contra mock) | Ambas ramas están listas en el remoto, solo faltan revisión y merge |
-| **Johan** | **No mergear** `feature/10-notificaciones-service` tal como está: sube a Java 25 / Spring Boot 3.5, y CLAUDE.md fija Java 21 · Spring Boot 3.3 | Evita que el stack se desalinee del contrato del docente |
-| **Brayan** | Revisar cruzado los PRs de Luis y Andrés cuando salgan; si sobra tiempo, arrancar `GET /v1/agenda/{profesionalId}` (#15, ver abajo) | Ya cerró su parte de agenda-service (dominio, EXCLUDE, outbox, gestión por token) |
+| **Brayan** | #17 · Testcontainers + prueba de concurrencia — es la única pieza de Fase 3 que `CLAUDE.md` marca obligatoria y que nunca se borra | Camino crítico para la sustentación |
+| **Andrés** | #16 · Reintentos y DLQ; #21 · Separación entre negocios | Ya activo, sigue con lo suyo |
+| **Luis** | #19 · `analitica-service` — sin arrancar | Retomar si vuelve a estar disponible; si no, se recorta primero (es 🟢) |
+| **Johan** | #18 · Recordatorio 24h; #20 · PWA panel de recepción — sin arrancar | Retomar si vuelve a estar disponible; si no, se recortan (🟡 y 🟢) |
 
-Pendientes menores de Fase 2 que **no** bloquean el cierre del circuito pero
-quedan abiertos: `feature/4-pwa-instalable-lighthouse` (botón de instalación
-propio) puede revisarse y mergearse cuando alguien tenga un rato libre.
+Pendiente menor: `feature/10-notificaciones-service` (PR #16 en GitHub) **no
+se mergea tal como está** — sube a Java 25 / Spring Boot 3.5 y `CLAUDE.md`
+fija Java 21 · Spring Boot 3.3 para todo el proyecto. Si la motivación real
+era el CVE de PostgreSQL JDBC, subir solo esa dependencia (`42.7.12`).
 
 ---
 
