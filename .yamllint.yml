@@ -1,0 +1,22 @@
+# Configuración de yamllint para AGENDA-D.
+# Local:  py -m yamllint .
+# CI:     .github/workflows/lint.yml
+extends: default
+
+ignore: |
+  **/target/**
+  **/node_modules/**
+
+rules:
+  # Las líneas de listeners de Kafka son largas por naturaleza.
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+  # docker-compose y los manifiestos no llevan `---` al inicio.
+  document-start: disable
+  # Permitimos mapas de flujo compactos: `{ condition: service_healthy }`.
+  braces:
+    max-spaces-inside: 1
+  # `on:` en los workflows de GitHub no es un booleano.
+  truthy:
+    check-keys: false

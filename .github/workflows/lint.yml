@@ -1,0 +1,38 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar linters de Python
+        run: pip install --quiet yamllint sqlfluff
+
+      - name: Markdown (markdownlint-cli2)
+        run: npx --yes markdownlint-cli2 "**/*.md"
+
+      - name: YAML (yamllint)
+        run: yamllint .
+
+      - name: Shell (shellcheck)
+        run: shellcheck --severity=warning setup-github.sh
+
+      - name: SQL (sqlfluff)
+        run: sqlfluff lint db/

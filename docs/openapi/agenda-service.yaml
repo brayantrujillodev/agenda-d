@@ -12,8 +12,8 @@ info:
     - Ruta administrativa: el negocio viaja en la cabecera `X-Negocio-Id`.
 
 servers:
-  - url: http://localhost:8080
-    description: Local vía Docker Compose
+  - url: http://localhost:8081
+    description: Local vía Docker Compose (perfil core)
 
 tags:
   - name: Público
@@ -179,7 +179,7 @@ paths:
                 servicioNombre: Corte de cabello
                 profesionalNombre: Laura
                 estado: CONFIRMADA
-                enlaceGestion: http://localhost:8080/v1/gestion/9f3c7a2b5e8d1064
+                enlaceGestion: http://localhost:8081/v1/gestion/9f3c7a2b5e8d1064
         '400':
           $ref: '#/components/responses/PeticionInvalida'
         '409':

@@ -1,0 +1,46 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: notificaciones-service
+
+  # Las tablas de notificaciones.* ya las crea db/V1__esquema_inicial.sql al
+  # arrancar Postgres. Este servicio no tiene su propia migración Flyway:
+  # cuando exista agenda-service, ese archivo pasa a vivir en su
+  # src/main/resources/db/migration/ (ver CLAUDE.md y docs/CONSTRUCCION.md).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agendad}
+    username: ${SPRING_DATASOURCE_USERNAME:agendad}
+    password: ${SPRING_DATASOURCE_PASSWORD:agendad}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none # Regla del proyecto: nunca ddl-auto: update
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: notificaciones-service
+      # earliest: permite consumir eventos publicados antes de que el
+      # consumidor existiera, útil para las pruebas manuales del Paso 4.
+      auto-offset-reset: earliest
+
+# REGISTRO = guarda el mensaje en BD en vez de enviarlo (sin costo).
+# Es el único canal implementado en la Fase 2; ver
+# co.edu.fet.agendad.notificaciones.canal.RegistroCanal.
+agendad:
+  canal-por-defecto: ${AGENDAD_CANAL_POR_DEFECTO:REGISTRO}
+
+management:
+  endpoint:
+    health:
+      show-details: never
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    co.edu.fet.agendad.notificaciones: INFO

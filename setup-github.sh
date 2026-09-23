@@ -10,6 +10,11 @@
 #
 # Uso:  bash setup-github.sh
 # =====================================================================
+
+# Los cuerpos de los issues van en comillas simples a propósito: son texto
+# Markdown literal (con `backticks` y $(comandos) de ejemplo) que NO debe
+# expandir el shell. Por eso se silencia SC2016 en todo el archivo.
+# shellcheck disable=SC2016
 set -e
 
 # ---- CAMBIA ESTO ANTES DE CORRERLO ----------------------------------

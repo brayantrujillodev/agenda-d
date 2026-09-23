@@ -21,21 +21,33 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 1 en curso.** Hoy funciona la infraestructura; los servicios Java
-todavía no tienen proyecto, así que sus carpetas están vacías y no se pueden
-construir. El Compose los deja definidos porque representan la infraestructura
-prevista, pero solo el perfil `infra` levanta sin errores.
+**Fase 2 en curso.** El circuito REST → persistencia → outbox → Kafka →
+consumidor está cerrado y probado de punta a punta con Docker real. Con
+`GET /v1/agenda/{profesionalId}` ([#20](../../pull/20)) y el gateway GraphQL
+([#14](../../pull/14)) ya mergeados, `panelRecepcion` consume `agenda-service`
+real y la Fase 2 queda cerrada. Detalle de tareas y dueños en
+[`docs/TAREAS.md`](docs/TAREAS.md).
 
 | Componente | Estado |
 |---|---|
 | PostgreSQL con el esquema y datos de prueba | ✅ funciona |
 | Kafka en KRaft y su consola | ✅ funciona |
-| Contratos OpenAPI, GraphQL y de eventos | ✅ acordados |
-| `agenda-service` | ⬜ por construir |
-| `notificaciones-service` | ⬜ por construir |
-| `gateway-graphql` | ✅ panelRecepcion con fallback de contrato |
+| Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
+| Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
+| `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
+| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
+| `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, con fallback a datos de ejemplo si el backend no responde ([#14](../../pull/14)) |
 | `analitica-service` | ⬜ por construir |
-| PWA de reserva | ⬜ por construir |
+| PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
+
+> **Avance · 2026-09-23.** Con el gateway GraphQL ([#14](../../pull/14))
+> mergeado, se cierra el circuito completo de la Fase 2: REST → persistencia
+> → outbox → Kafka → `notificaciones-service` consumiendo → gateway GraphQL
+> respondiendo `panelRecepcion` con datos reales de `agenda-service`, más la
+> PWA pública. Queda pendiente para Fase 3: `analitica-service`, DLQ y
+> reintentos, Testcontainers con la prueba de concurrencia, y el recordatorio
+> de 24 h con recuperación tras reinicio.
+> Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
 
@@ -66,29 +78,56 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
 **Perfiles.** `infra` levanta base de datos, Kafka y la consola. `core` añade
-`agenda-service` y `full` añade el resto — esos dos empezarán a funcionar a
-medida que existan los proyectos con su `pom.xml` y su `Dockerfile`.
+`agenda-service` (ya funciona) y `full` añade el resto — `gateway-graphql` y
+`analitica-service` empezarán a funcionar a medida que existan sus proyectos.
 
 | Servicio | URL | Estado |
 |---|---|---|
 | PostgreSQL | localhost:5432 · `agendad`/`agendad` | activo |
 | Kafka desde el equipo | localhost:29092 | activo |
-| Consola de Kafka | http://localhost:8090 | activo |
-| agenda-service | http://localhost:8081 | por construir |
-| gateway GraphQL | http://localhost:8080/graphiql | activo |
+| Consola de Kafka | <http://localhost:8090> | activo |
+| agenda-service | <http://localhost:8081> | activo |
+| gateway GraphQL | <http://localhost:8080/graphiql> | activo |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
 
 Para bajar todo y empezar de cero:
+
 ```bash
 docker compose --profile full down -v
 ```
 
 ---
 
+## Despliegue
+
+GitHub Actions publica dos cosas por separado — ninguna necesita más cuenta
+que GitHub:
+
+- **`web/` → GitHub Pages**, automático en cada push a `main` que toque esa
+  carpeta ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)).
+  Solo hay que activar Pages una vez en *Settings → Pages → Source: GitHub
+  Actions*. Mientras `web/config.js` tenga `useMock`, sirve para mostrar el
+  flujo de reserva sin backend.
+- **Imágenes de `agenda-service` y `notificaciones-service` → GHCR**, al
+  empujar un tag `vX.Y.Z`
+  ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Crea
+  además el GitHub Release con las notas. `gateway-graphql` y
+  `analitica-service` no se publican todavía: no existen como proyecto (ver
+  «Estado actual»).
+
+El despliegue del backend en un servidor (`docker-compose.prod.yml`, ya con
+Postgres real) queda listo pero apagado hasta tener dónde correrlo: se activa
+solo con la variable de repo `DEPLOY_ENABLED=true` y los secrets
+`DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (*Settings → Secrets and
+variables → Actions*). Sin esos tres secrets el job de despliegue se salta
+solo, no falla.
+
+---
+
 ## Estructura
 
-```
+```text
 agenda-d/
 ├─ docker-compose.yml
 ├─ agenda-service/          Dominio: citas, cupos, configuración. Productor.
@@ -152,23 +191,28 @@ correctas pero van después. El plan está ordenado según eso.
 
 Capacidad real: ~20 horas semanales entre los cuatro.
 
-### Fase 1 · Semanas 1–5 · Cimientos
-- [ ] Contratos OpenAPI y GraphQL revisados y aprobados por todos
-- [ ] Migración Flyway con el `EXCLUDE` corriendo
-- [ ] Contrato de eventos acordado
-- [ ] `docker compose --profile core up` levanta agenda-service con `/actuator/health`
-- [ ] `agenda-service` consulta cupos y reserva contra la BD real
+### Fase 1 · Semanas 1–5 · Cimientos — ✅ cerrada
 
-### Fase 2 · Semanas 6–10 · Flujo mínimo completo
+- [x] Contratos OpenAPI, GraphQL y de eventos en el repo (`docs/`)
+- [x] Migración con el `EXCLUDE` en el repo (`db/V1__esquema_inicial.sql`)
+- [x] Migración Flyway con el `EXCLUDE` corriendo desde `agenda-service`
+- [x] `docker compose --profile core up` levanta agenda-service con `/actuator/health`
+- [x] `agenda-service` consulta cupos y reserva contra la BD real
+
+### Fase 2 · Semanas 6–10 · Flujo mínimo completo — 🔶 en curso
+
 **El hito del semestre.** Al cerrarlo, el sistema recorre el circuito entero.
-- [ ] Outbox publicando `citas.reservadas`
-- [ ] `notificaciones-service` consumiendo y guardando el mensaje
-- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion`
-- [ ] PWA pública de reserva contra la API real
+
+- [x] Outbox publicando `citas.reservadas`
+- [x] `notificaciones-service` consumiendo y guardando el mensaje
+- [ ] `gateway-graphql` respondiendo la consulta `panelRecepcion` — **sin empezar, es lo que falta cerrar**
+- [ ] PWA pública de reserva contra la API real — UI lista, conexión al backend real en rama sin mergear
 
 Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
+Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
 
 ### Fase 3 · Semanas 11–15 · Robustez
+
 - [ ] DLQ con reintentos y espera creciente
 - [ ] Idempotencia verificada
 - [ ] Testcontainers con la prueba de concurrencia (100 hilos)
@@ -177,6 +221,7 @@ Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
 - [ ] Prueba de separación entre negocios
 
 ### Semana 15
+
 Ensayar la sustentación. Los cuatro, todo el flujo.
 
 ---

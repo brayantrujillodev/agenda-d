@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  maven:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Compilar y probar los servicios con pom.xml
+        run: |
+          set -e
+          construidos=0
+          for pom in */pom.xml; do
+            [ -f "$pom" ] || continue
+            dir=$(dirname "$pom")
+            echo "::group::mvn verify · $dir"
+            (cd "$dir" && mvn -B -ntp verify)
+            echo "::endgroup::"
+            construidos=$((construidos + 1))
+          done
+          if [ "$construidos" -eq 0 ]; then
+            echo "No hay servicios con pom.xml en esta rama; nada que construir."
+          else
+            echo "Servicios construidos: $construidos"
+          fi

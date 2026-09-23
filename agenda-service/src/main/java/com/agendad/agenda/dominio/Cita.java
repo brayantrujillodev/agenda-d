@@ -1,0 +1,160 @@
+package com.agendad.agenda.dominio;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * Cita agendada. El corazón del sistema.
+ *
+ * La ausencia de solapamiento la garantiza la restricción {@code cita_sin_solape}
+ * de PostgreSQL, no este código. La creación de citas llega en feature/3.
+ */
+@Entity
+@Table(name = "cita")
+public class Cita {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "negocio_id")
+    private UUID negocioId;
+
+    @Column(name = "servicio_id")
+    private UUID servicioId;
+
+    @Column(name = "profesional_id")
+    private UUID profesionalId;
+
+    private Instant inicio;
+
+    private Instant fin;
+
+    @Column(name = "cliente_nombre")
+    private String clienteNombre;
+
+    @Column(name = "cliente_celular")
+    private String clienteCelular;
+
+    @Enumerated(EnumType.STRING)
+    private EstadoCita estado;
+
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
+    @Column(name = "creada_en")
+    private Instant creadaEn;
+
+    @Column(name = "actualizada_en")
+    private Instant actualizadaEn;
+
+    protected Cita() {
+    }
+
+    /**
+     * Crea una cita nueva en estado {@code CONFIRMADA}. El {@code fin} lo
+     * calcula el caso de uso con la duración del servicio. No comprueba
+     * solapamiento: eso lo arbitra la restricción {@code cita_sin_solape}
+     * de PostgreSQL cuando se persiste.
+     */
+    public Cita(UUID negocioId, UUID servicioId, UUID profesionalId,
+                Instant inicio, Instant fin, String clienteNombre,
+                String clienteCelular, String idempotencyKey) {
+        this.negocioId = negocioId;
+        this.servicioId = servicioId;
+        this.profesionalId = profesionalId;
+        this.inicio = inicio;
+        this.fin = fin;
+        this.clienteNombre = clienteNombre;
+        this.clienteCelular = clienteCelular;
+        this.idempotencyKey = idempotencyKey;
+        this.estado = EstadoCita.CONFIRMADA;
+        Instant ahora = Instant.now();
+        this.creadaEn = ahora;
+        this.actualizadaEn = ahora;
+    }
+
+    /** ¿Sigue en pie? Solo una cita CONFIRMADA puede cancelarse o atenderse. */
+    public boolean estaConfirmada() {
+        return estado == EstadoCita.CONFIRMADA;
+    }
+
+    public boolean estaCancelada() {
+        return estado == EstadoCita.CANCELADA;
+    }
+
+    /**
+     * Marca la cita como cancelada. El cupo vuelve a estar libre: la
+     * restricción {@code cita_sin_solape} deja de contar esta fila.
+     */
+    public void cancelar() {
+        this.estado = EstadoCita.CANCELADA;
+        this.actualizadaEn = Instant.now();
+    }
+
+    /**
+     * Cierra la cita con su resultado ({@code ATENDIDA} o {@code NO_ASISTIO}).
+     * El llamador valida que la cita esté {@code CONFIRMADA}: aquí solo se
+     * aplica el cambio.
+     */
+    public void marcarResultado(EstadoCita resultado) {
+        this.estado = resultado;
+        this.actualizadaEn = Instant.now();
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getNegocioId() {
+        return negocioId;
+    }
+
+    public UUID getServicioId() {
+        return servicioId;
+    }
+
+    public UUID getProfesionalId() {
+        return profesionalId;
+    }
+
+    public Instant getInicio() {
+        return inicio;
+    }
+
+    public Instant getFin() {
+        return fin;
+    }
+
+    public String getClienteNombre() {
+        return clienteNombre;
+    }
+
+    public String getClienteCelular() {
+        return clienteCelular;
+    }
+
+    public EstadoCita getEstado() {
+        return estado;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public Instant getCreadaEn() {
+        return creadaEn;
+    }
+
+    public Instant getActualizadaEn() {
+        return actualizadaEn;
+    }
+}

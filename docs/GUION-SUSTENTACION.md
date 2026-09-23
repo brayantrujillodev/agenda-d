@@ -7,7 +7,7 @@ todo, venga la pregunta por donde venga.
 
 ---
 
-# PARTE 1 · Las cinco ideas
+## PARTE 1 · Las cinco ideas
 
 Si entiendes esto, lo demás sale solo.
 
@@ -83,7 +83,7 @@ resolver necesitara consultar una tabla, la responsabilidad estaría mal puesta.
 
 ---
 
-# PARTE 2 · Números que hay que tener en la cabeza
+## PARTE 2 · Números que hay que tener en la cabeza
 
 | Cosa | Dato |
 |---|---|
@@ -102,7 +102,7 @@ resolver necesitara consultar una tabla, la responsabilidad estaría mal puesta.
 
 ---
 
-# PARTE 3 · Preguntas probables
+## PARTE 3 · Preguntas probables
 
 Respuestas de dos o tres frases. No las recites: entiéndelas.
 
@@ -242,7 +242,7 @@ prácticamente nada.
 
 ---
 
-# PARTE 4 · Las tres trampas
+## PARTE 4 · Las tres trampas
 
 **«¿Y si les pido agregar X?»**
 No respondas «sí, fácil». Responde qué se caería a cambio. El documento tiene
@@ -258,7 +258,7 @@ nuestro alcance. Está documentado en decisiones pendientes.
 
 ---
 
-# PARTE 5 · Si no sabes algo
+## PARTE 5 · Si no sabes algo
 
 Dilo. *«Eso no lo hemos definido todavía, está en decisiones pendientes»* o
 *«no manejo ese detalle, lo trabajó [nombre], pero la idea general es…»*.
@@ -269,7 +269,7 @@ las cinco ideas, casi nada te va a tomar por sorpresa.
 
 ---
 
-# La demostración, si la piden
+## La demostración, si la piden
 
 En este orden:
 
