@@ -210,27 +210,25 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 
 ---
 
-### 🔴 #11 · Gateway GraphQL con `panelRecepcion` — SIN EMPEZAR, es el hueco crítico
+### ✅ #11 · Gateway GraphQL con `panelRecepcion` — cerrado
 
 **Asignado:** Luis · **Toca:** `gateway-graphql/` · **Depende de:** #7, #8
 
-`gateway-graphql/` solo tiene un `.gitkeep`. Ningún `pom.xml`, ninguna clase.
-De todo el flujo mínimo (REST → persistencia → outbox → Kafka → consumidor →
-GraphQL) es el único tramo que falta por completo. Con `agenda-service` ya
-sirviendo `/v1/publico/{slug}/disponibilidad`, `/v1/publico/{slug}/citas` y
-(falta) `/v1/agenda/{profesionalId}`, hay suficiente para construir el
-resolver.
-
-- [ ] `pom.xml` + esqueleto Spring Boot con Spring for GraphQL
-- [ ] Esquema cargado desde `docs/graphql/schema.graphqls`
-- [ ] Resolver de `panelRecepcion` llamando a `agenda-service` por REST
-- [ ] `/graphiql` habilitado para la demostración
+- [x] `pom.xml` + esqueleto Spring Boot con Spring for GraphQL
+- [x] Esquema cargado desde `docs/graphql/schema.graphqls` (idéntico al contrato)
+- [x] Resolver de `panelRecepcion` llamando a `agenda-service` por REST, con
+      fallback a datos de ejemplo si el backend no responde
+- [x] `/graphiql` habilitado para la demostración
 
 **Aceptación:** una sola consulta devuelve agenda del día + configuración.
+Cumplida vía [PR #14](../../pull/14).
 
-> El docente lo incluyó dentro del flujo mínimo: por eso está aquí y no al
-> final. Las métricas pueden devolver valores fijos mientras no exista
-> `analitica-service`.
+> El docente lo incluyó dentro del flujo mínimo. Las métricas devuelven
+> valores fijos mientras no exista `analitica-service` (Fase 3). Las
+> mutaciones del esquema (`crearServicio`, `crearBloqueo`, etc.) quedan para
+> cuando exista el `ConfiguracionController` (#14 de este backlog) — no
+> bloquean el cierre de la Fase 2, que solo exige que `panelRecepcion`
+> resuelva con datos reales.
 
 ---
 
