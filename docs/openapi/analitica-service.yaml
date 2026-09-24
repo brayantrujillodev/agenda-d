@@ -1,0 +1,146 @@
+openapi: 3.0.3
+
+info:
+  title: AGENDA-D · analitica-service
+  version: 0.1.0
+  description: |
+    Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
+
+    **PLANEADO — Fase 3, todavía no implementado.** `analitica-service/`
+    solo tiene un `.gitkeep`: ningún `pom.xml`, ninguna clase (ver
+    "Estado actual" en el README y `docs/TAREAS.md`, tarea #19). Este
+    contrato existe para acordar la forma del endpoint **antes** de
+    programarlo — el mismo principio de "contratos primero" que ya se usó
+    para `agenda-service`.
+
+    Cuando exista, este servicio consumirá `citas.reservadas`,
+    `citas.canceladas` y `citas.estado` por Kafka, actualizará una tabla
+    `metrica_diaria` y expondrá el endpoint de abajo, que el gateway
+    GraphQL resolverá para el campo `metricas` del esquema
+    (`docs/graphql/schema.graphqls`). El mismo path ya aparece, por ahora
+    sin implementar, en `docs/openapi/agenda-service.yaml`: al construir
+    este servicio, esa ruta se retira de ahí.
+
+servers:
+  - url: http://localhost:8083
+    description: Local (puerto reservado en docker-compose.yml, perfil full)
+
+tags:
+  - name: Métricas
+    description: Indicadores de ocupación e inasistencia del negocio
+
+paths:
+
+  /v1/metricas:
+    get:
+      tags: [Métricas]
+      summary: Indicadores del negocio en un periodo
+      parameters:
+        - name: X-Negocio-Id
+          in: header
+          required: true
+          description: Identificador del negocio (sin autenticación en este alcance)
+          schema:
+            type: string
+            format: uuid
+          example: 11111111-1111-1111-1111-111111111111
+        - name: desde
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: hasta
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Métricas del periodo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metricas'
+              example:
+                desde: '2026-08-01'
+                hasta: '2026-08-31'
+                totalCitas: 184
+                atendidas: 160
+                noAsistio: 18
+                canceladas: 6
+                ocupacion: 72.5
+                tasaInasistencia: 9.8
+                topServicios:
+                  - servicio: Corte de cabello
+                    cantidad: 120
+        '400':
+          description: Rango de fechas inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: DATOS_INVALIDOS
+                mensaje: La fecha "desde" no puede ser posterior a "hasta".
+
+  /actuator/health:
+    get:
+      tags: [Métricas]
+      summary: Estado del servicio
+      responses:
+        '200':
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [UP, DOWN]
+
+components:
+  schemas:
+    Metricas:
+      type: object
+      properties:
+        desde:
+          type: string
+          format: date
+        hasta:
+          type: string
+          format: date
+        totalCitas:
+          type: integer
+        atendidas:
+          type: integer
+        noAsistio:
+          type: integer
+        canceladas:
+          type: integer
+        ocupacion:
+          type: number
+          description: Porcentaje 0-100. Minutos ocupados sobre minutos disponibles.
+        tasaInasistencia:
+          type: number
+          description: Porcentaje 0-100.
+        topServicios:
+          type: array
+          items:
+            type: object
+            properties:
+              servicio:
+                type: string
+              cantidad:
+                type: integer
+
+    Error:
+      type: object
+      properties:
+        codigo:
+          type: string
+        mensaje:
+          type: string
+          description: En español claro. Nunca un stacktrace.
