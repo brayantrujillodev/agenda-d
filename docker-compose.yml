@@ -139,6 +139,8 @@ services:
       # REGISTRO = guarda el mensaje en BD en vez de enviarlo. Sin costo.
       AGENDAD_CANAL_POR_DEFECTO: REGISTRO
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8088:8080"
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
