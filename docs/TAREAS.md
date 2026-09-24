@@ -13,23 +13,25 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
-## Estado y próximos pasos · 2026-09-23
+## Estado y próximos pasos · 2026-09-24
 
-**Fase 2 cerrada de punta a punta.** Con el gateway GraphQL mergeado
-([PR #14](../../pull/14)), el circuito completo funciona: REST →
+**Fase 2 cerrada de punta a punta.** El circuito completo funciona: REST →
 persistencia → outbox → Kafka → `notificaciones-service` consumiendo →
 gateway GraphQL respondiendo `panelRecepcion` con datos reales de
 `agenda-service`, más la PWA pública instalable.
 
-Luis y Johan no están contribuyendo activamente por ahora. El resto del
-equipo sigue con el backlog de Fase 3, reasignando lo que estaba en su
-cabeza si hace falta:
+**`analitica-service` ya existe y está cerrado (#19)**, adelantado de Fase 3
+porque Luis no está activo y el resto del equipo necesitaba la pieza para
+seguir probando el panel completo. `panelRecepcion.metricasDelMes` y la
+query `metricas` ya resuelven contra datos reales, no contra el stub fijo.
+
+Luis y Johan siguen sin contribuir activamente. El resto del equipo sigue
+con lo que queda de Fase 3:
 
 | Quién | Qué tiene pendiente ahora mismo | Nota |
 |---|---|---|
 | **Brayan** | #17 · Testcontainers + prueba de concurrencia — es la única pieza de Fase 3 que `CLAUDE.md` marca obligatoria y que nunca se borra | Camino crítico para la sustentación |
 | **Andrés** | #16 · Reintentos y DLQ; #21 · Separación entre negocios | Ya activo, sigue con lo suyo |
-| **Luis** | #19 · `analitica-service` — sin arrancar | Retomar si vuelve a estar disponible; si no, se recorta primero (es 🟢) |
 | **Johan** | #18 · Recordatorio 24h; #20 · PWA panel de recepción — sin arrancar | Retomar si vuelve a estar disponible; si no, se recortan (🟡 y 🟢) |
 
 Pendiente menor: `feature/10-notificaciones-service` (PR #16 en GitHub) **no
@@ -101,15 +103,14 @@ Al cerrar la fase, `agenda-service` reserva contra la base de datos real.
 
 ---
 
-### 🔶 #4 · Esqueletos de los servicios Spring Boot — parcial
+### ✅ #4 · Esqueletos de los servicios Spring Boot — cerrado
 
 **Asignado:** Luis · **Toca:** `*/pom.xml`, `*/Dockerfile`, `*/Application.java`, `*/application.yml`
 **Depende de:** #2
 
-- [x] Java 21, Spring Boot 3.3 — `agenda-service` y `notificaciones-service`
-- [ ] `gateway-graphql` y `analitica-service` siguen sin `pom.xml` (solo `.gitkeep`)
-- [ ] Dockerfile multi-stage por servicio
-- [x] `/actuator/health` respondiendo en `agenda-service` y `notificaciones-service`
+- [x] Java 21, Spring Boot 3.3 — los cuatro servicios
+- [x] Dockerfile multi-stage por servicio
+- [x] `/actuator/health` respondiendo en los cuatro
 - [x] `agenda-service` con springdoc y Flyway conectados
 
 > ⚠️ Una rama sin mergear (`feature/10-notificaciones-service`) sube
@@ -229,8 +230,8 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 **Aceptación:** una sola consulta devuelve agenda del día + configuración.
 Cumplida vía [PR #14](../../pull/14).
 
-> El docente lo incluyó dentro del flujo mínimo. Las métricas devuelven
-> valores fijos mientras no exista `analitica-service` (Fase 3). Las
+> El docente lo incluyó dentro del flujo mínimo. Las métricas ya resuelven
+> contra `analitica-service` real (#19, adelantado de Fase 3). Las
 > mutaciones del esquema (`crearServicio`, `crearBloqueo`, etc.) quedan para
 > cuando exista el `ConfiguracionController` (#14 de este backlog) — no
 > bloquean el cierre de la Fase 2, que solo exige que `panelRecepcion`
@@ -342,12 +343,29 @@ Programación persistida en tabla, `@Scheduled` que dispara los vencidos,
 recuperación al reiniciar, cancelación al cancelar la cita.
 **Aceptación:** se programa, se reinicia el contenedor y el recordatorio sale.
 
-### 🟢 #19 · analitica-service
+### ✅ #19 · analitica-service — cerrado
 
-**Asignado:** Luis · **Depende de:** #9
-Consume los tres tópicos y actualiza `metrica_diaria`. `GET /v1/metricas`.
-Se conecta al `panelRecepcion` que ya existe.
-**Aceptación:** las cifras cuadran con la tabla `cita`.
+**Asignado:** Luis (retomado por Brayan) · **Depende de:** #9
+
+- [x] Consume `citas.reservadas`, `citas.canceladas` y `citas.estado`,
+      deduplica por `eventoId` (mismo patrón que notificaciones-service)
+- [x] Actualiza `analitica.metrica_diaria` con upserts atómicos
+- [x] `GET /v1/metricas` (`X-Negocio-Id`, `desde`, `hasta`)
+- [x] `gateway-graphql` ya no usa el stub fijo: `panelRecepcion.metricasDelMes`
+      y la query `metricas` resuelven contra este servicio (con fallback a
+      ceros si no responde, mismo patrón que `AgendaClient`)
+
+**Aceptación:** verificado a mano contra Docker real — reservar una cita,
+marcarla `ATENDIDA` y ver las cifras reales en `GET /v1/metricas` y en
+`panelRecepcion` por GraphQL.
+
+> Simplificación documentada (ver `docs/openapi/analitica-service.yaml`):
+> `ocupacion` estima minutos disponibles con una jornada configurable
+> (600 min/día por defecto) en vez de leer `agenda.horario_atencion` —
+> cruzar esquemas entre servicios no es el patrón del proyecto.
+> `topServicios` devuelve vacío: la tabla solo guarda `servicioId`, no el
+> nombre. Ambas son mejoras válidas para retomar después, no bloquean el
+> cierre de esta tarea.
 
 ### 🟢 #20 · PWA · panel de recepción
 

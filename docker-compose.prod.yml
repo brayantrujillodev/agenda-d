@@ -3,8 +3,7 @@
 #
 # A diferencia de docker-compose.yml (que compila cada servicio con
 # `build:` para desarrollo), este archivo usa las imágenes ya publicadas
-# en GHCR por .github/workflows/release.yml. No incluye analitica-service:
-# todavía no existe como proyecto (ver README).
+# en GHCR por .github/workflows/release.yml.
 #
 # Uso en el servidor:
 #   export GHCR_REPO=ghcr.io/<owner>/<repo>
@@ -112,11 +111,28 @@ services:
     restart: unless-stopped
     environment:
       AGENDAD_AGENDA_URL: http://agenda-service:8081
+      AGENDAD_ANALITICA_URL: http://analitica-service:8083
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
       - "8080:8080"
     depends_on:
       agenda-service: { condition: service_healthy }
+    mem_limit: 512m
+    networks: [agenda-net]
+
+  analitica-service:
+    image: ${GHCR_REPO}/analitica-service:${TAG:-latest}
+    container_name: agd-analitica
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
+      SPRING_DATASOURCE_USERNAME: agendad
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-agendad}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
     mem_limit: 512m
     networks: [agenda-net]
 

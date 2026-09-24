@@ -1,0 +1,48 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: analitica-service
+
+  # El esquema analitica.* ya lo crea db/V1__esquema_inicial.sql al arrancar
+  # Postgres. Igual que notificaciones-service, este servicio no tiene su
+  # propia migración Flyway: la dueña del esquema compartido es
+  # agenda-service (ver CLAUDE.md y docs/CONSTRUCCION.md).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agendad}
+    username: ${SPRING_DATASOURCE_USERNAME:agendad}
+    password: ${SPRING_DATASOURCE_PASSWORD:agendad}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none # Regla del proyecto: nunca ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: analitica
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: analitica-service
+      auto-offset-reset: earliest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+agendad:
+  metricas:
+    # Simplificación documentada (ver README del servicio): calcular la
+    # ocupación real requiere el horario de atención real de cada
+    # profesional, que vive en agenda.horario_atencion (otro esquema, sin
+    # FK entre servicios). Mientras no exista esa integración, se usa una
+    # jornada fija configurable para estimar minutos disponibles.
+    minutos-habiles-dia: ${AGENDAD_MINUTOS_HABILES_DIA:600}
+    zona-horaria-por-defecto: ${AGENDAD_ZONA_HORARIA_POR_DEFECTO:America/Bogota}
