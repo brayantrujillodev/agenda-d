@@ -172,6 +172,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8083:8083"
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }

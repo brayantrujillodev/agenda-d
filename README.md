@@ -37,26 +37,44 @@ Detalle de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
 | `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
 | `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
 | `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, verificado con una reserva real de punta a punta ([#14](../../pull/14), fix de URI en [#23](../../pull/23)) |
-| `analitica-service` | ⬜ por construir |
+| `analitica-service` | ✅ consume los tres tópicos, actualiza `metrica_diaria`, `GET /v1/metricas` — adelantado de Fase 3, ver nota |
 | PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
 
 **Release publicado:** [`v1.0.2`](../../releases/tag/v1.0.2) — imágenes de
 `agenda-service`, `notificaciones-service` y `gateway-graphql` en GHCR.
 (`v1.0.1` quedó publicado con un bug real en `gateway-graphql` que hacía que
 `panelRecepcion` siempre devolviera datos de ejemplo aunque el backend
-respondiera bien — no usar esa versión, se deja el tag por trazabilidad.)
+respondiera bien — no usar esa versión, se deja el tag por trazabilidad.
+`analitica-service` es posterior a este tag, todavía no tiene su propia
+imagen publicada.)
 
-> **Avance · 2026-09-23.** Con Docker instalado y los seis contenedores
-> arriba (`--profile core` + `gateway-graphql` + `notificaciones-service`),
-> se probó el circuito completo a mano: reservar una cita real por REST y
-> verla aparecer en `panelRecepcion` vía GraphQL. Esa prueba encontró un bug
-> real — `AgendaClient` armaba mal la URI de `/v1/agenda/{id}` y el
-> `RestClientException` quedaba silenciado, así que el gateway **nunca**
-> había leído la agenda real, ni en el PR #14 ni en el release `v1.0.1` —
-> corregido en [#23](../../pull/23) y republicado como `v1.0.2`. Queda
-> pendiente para Fase 3: `analitica-service`, DLQ y reintentos, Testcontainers
-> con la prueba de concurrencia, y el recordatorio de 24 h con recuperación
-> tras reinicio.
+> **Avance · 2026-09-24.** Se construyó `analitica-service` completo,
+> adelantado de Fase 3 (docs/TAREAS.md #19) porque Luis no está activo y el
+> resto del equipo necesitaba la pieza para seguir probando el panel
+> completo. Consume `citas.reservadas`, `citas.canceladas` y `citas.estado`,
+> deduplica por `eventoId` y actualiza `analitica.metrica_diaria` con
+> upserts atómicos. `gateway-graphql` ya no usa el stub fijo de métricas:
+> `panelRecepcion.metricasDelMes` resuelve contra datos reales, verificado
+> a mano reservando una cita, marcándola `ATENDIDA` y viendo las cifras
+> correctas tanto en `GET /v1/metricas` como en GraphQL. Dos
+> simplificaciones quedan documentadas en el contrato: `ocupacion` usa una
+> jornada configurable en vez de leer el horario real (cruzar esquemas
+> entre servicios no es el patrón del proyecto) y `topServicios` devuelve
+> vacío (la tabla no guarda el nombre del servicio, solo su id).
+>
+> También se agregaron los contratos OpenAPI de `notificaciones-service` y
+> `gateway-graphql` (documentan su superficie HTTP real — ninguno tiene API
+> de negocio REST) y se corrigió un bug real en `docker-compose.yml`: dos
+> servicios mapeaban el puerto equivocado.
+>
+> Se confirmó con el docente que Docker no es obligatorio para correr los
+> microservicios: los tres ya se probaron corriendo directo con
+> `mvn spring-boot:run` contra Postgres/Kafka en Docker (`--profile infra`),
+> sin empaquetarlos en contenedor — ver "Arranque sin Docker" más abajo.
+>
+> Sigue pendiente para Fase 3: DLQ y reintentos, Testcontainers con la
+> prueba de concurrencia, y el recordatorio de 24 h con recuperación tras
+> reinicio.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -69,14 +87,33 @@ git clone <url> && cd agenda-d
 # Base de datos + bus de eventos + agenda-service
 docker compose --profile core up -d
 
-# Si además quieres el gateway GraphQL y notificaciones-service
-# (analitica-service todavía no tiene proyecto, así que --profile full falla
-# hasta que exista: mejor levantar estos dos servicios por nombre)
-docker compose up -d gateway-graphql notificaciones-service kafka-ui
+# Todo, incluidos gateway-graphql, notificaciones-service y analitica-service
+docker compose --profile full up -d
 ```
 
 Con eso arriba puedes conectarte a la base y ver el esquema ya creado con sus
 datos de prueba. La migración se aplica sola la primera vez.
+
+### Arranque sin Docker (los microservicios, no la base de datos)
+
+El docente confirmó que Docker no es obligatorio para correr los
+microservicios — solo hace falta para Postgres y Kafka, que sí conviene
+dejar en contenedor. Con Java 21 y Maven instalados (o, como en esta
+máquina, ya empaquetados con IntelliJ IDEA en
+`plugins/maven/lib/maven3`), cada servicio corre directo:
+
+```bash
+docker compose --profile infra up -d   # solo Postgres + Kafka + consola
+
+cd agenda-service          && mvn spring-boot:run   # puerto 8081
+cd notificaciones-service  && mvn spring-boot:run   # puerto 8082
+cd gateway-graphql         && mvn spring-boot:run   # puerto 8080
+cd analitica-service       && mvn spring-boot:run   # puerto 8083
+```
+
+Los `application.yml` de los cuatro ya apuntan a `localhost` por defecto
+(`SPRING_DATASOURCE_URL`, `SPRING_KAFKA_BOOTSTRAP_SERVERS`), así que no hace
+falta ninguna variable de entorno extra para esta forma de correrlos.
 
 ```bash
 # Ver las tablas
@@ -93,11 +130,9 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
 **Perfiles.** `infra` levanta base de datos, Kafka y la consola. `core` añade
-`agenda-service`. `full` intenta levantar también `notificaciones-service`,
-`gateway-graphql` y `analitica-service`, pero **falla** porque
-`analitica-service` todavía no tiene `Dockerfile` (solo `.gitkeep`) — mientras
-tanto, levanta esos dos servicios por nombre en vez de `--profile full`:
-`docker compose up -d gateway-graphql notificaciones-service kafka-ui`.
+`agenda-service`. `full` levanta también `notificaciones-service`,
+`gateway-graphql` y `analitica-service` — los cuatro tienen ya su `pom.xml`
+y `Dockerfile`.
 
 | Servicio | URL | Estado |
 |---|---|---|
@@ -106,6 +141,8 @@ tanto, levanta esos dos servicios por nombre en vez de `--profile full`:
 | Consola de Kafka | <http://localhost:8090> | activo |
 | agenda-service | <http://localhost:8081> | activo |
 | gateway GraphQL | <http://localhost:8080/graphiql> | activo |
+| analitica-service | <http://localhost:8083/v1/metricas> | activo |
+| notificaciones-service | localhost:8082 (sin UI, solo `/actuator/health`) | activo |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
 
@@ -129,11 +166,9 @@ que GitHub:
   así que esa URL pública solo reserva contra un `agenda-service` que corra
   en la máquina de quien la abre — no es un backend compartido. Para volver
   a la demo sin backend, pon `useMock: true`.
-- **Imágenes de `agenda-service`, `notificaciones-service` y
-  `gateway-graphql` → GHCR**, al empujar un tag `vX.Y.Z`
+- **Imágenes de los cuatro servicios → GHCR**, al empujar un tag `vX.Y.Z`
   ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Crea
-  además el GitHub Release con las notas. `analitica-service` no se publica
-  todavía: no existe como proyecto (ver «Estado actual»).
+  además el GitHub Release con las notas.
 
 El despliegue del backend en un servidor (`docker-compose.prod.yml`, ya con
 Postgres real) queda listo pero apagado hasta tener dónde correrlo: se activa
@@ -238,7 +273,7 @@ Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
 - [ ] Idempotencia verificada
 - [ ] Testcontainers con la prueba de concurrencia (100 hilos)
 - [ ] Recordatorio de 24 h con recuperación tras reinicio
-- [ ] `analitica-service` y panel de recepción
+- [x] `analitica-service` — adelantado; falta el panel de recepción en la PWA
 - [ ] Prueba de separación entre negocios
 
 ### Semana 15

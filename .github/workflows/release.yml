@@ -2,10 +2,8 @@
 # release · publica imágenes Docker y crea el GitHub Release
 #
 # Se dispara al empujar un tag "vX.Y.Z". Construye y publica en GHCR
-# los servicios que ya existen como proyecto (agenda-service,
-# notificaciones-service y gateway-graphql). analitica-service no está
-# construido todavía (ver README "Estado actual"): no se referencia
-# aquí a propósito.
+# los cuatro servicios: agenda-service, notificaciones-service,
+# gateway-graphql y analitica-service.
 #
 # El despliegue por SSH es opcional y queda apagado hasta que el equipo
 # tenga un servidor: solo corre si la variable de repo DEPLOY_ENABLED
@@ -31,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        servicio: [agenda-service, notificaciones-service, gateway-graphql]
+        servicio: [agenda-service, notificaciones-service, gateway-graphql, analitica-service]
     steps:
       - uses: actions/checkout@v4
 
@@ -64,14 +62,15 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           cat > /tmp/notas.md <<EOF
-          Imágenes: ghcr.io/${REPO}/{agenda-service,notificaciones-service,gateway-graphql}:${TAG}
+          Imágenes: ghcr.io/${REPO}/{agenda-service,notificaciones-service,gateway-graphql,analitica-service}:${TAG}
 
           Alcance de este release (ver README "Estado actual"):
-          agenda-service + notificaciones-service + gateway-graphql + PWA.
-          Circuito de Fase 2 cerrado de punta a punta: REST → persistencia
-          → outbox → Kafka → notificaciones-service → gateway GraphQL
-          (panelRecepcion) → PWA pública.
-          analitica-service todavía no existe como proyecto (Fase 3).
+          agenda-service + notificaciones-service + gateway-graphql +
+          analitica-service + PWA. Circuito de Fase 2 cerrado de punta a
+          punta: REST → persistencia → outbox → Kafka →
+          notificaciones-service → gateway GraphQL (panelRecepcion) → PWA
+          pública. panelRecepcion.metricasDelMes ya resuelve contra
+          analitica-service real (adelantado de Fase 3).
           EOF
           gh release create "$TAG" --title "$TAG" --generate-notes \
             --notes-file /tmp/notas.md

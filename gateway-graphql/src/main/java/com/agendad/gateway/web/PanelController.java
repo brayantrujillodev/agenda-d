@@ -1,6 +1,7 @@
 package com.agendad.gateway.web;
 
 import com.agendad.gateway.client.AgendaClient;
+import com.agendad.gateway.client.AnaliticaClient;
 import com.agendad.gateway.model.Cita;
 import com.agendad.gateway.model.Metricas;
 import com.agendad.gateway.model.Negocio;
@@ -17,9 +18,11 @@ import java.util.List;
 public class PanelController {
 
     private final AgendaClient agendaClient;
+    private final AnaliticaClient analiticaClient;
 
-    public PanelController(AgendaClient agendaClient) {
+    public PanelController(AgendaClient agendaClient, AnaliticaClient analiticaClient) {
         this.agendaClient = agendaClient;
+        this.analiticaClient = analiticaClient;
     }
 
     @QueryMapping
@@ -28,8 +31,8 @@ public class PanelController {
         List<Servicio> servicios = agendaClient.servicios();
         List<Cita> citas = agendaClient.citas(fechaSolicitada, servicios);
         Negocio negocio = agendaClient.negocio(servicios);
-        return new PanelRecepcion(fechaSolicitada, negocio, citas,
-                metricasSinAnalitica(fechaSolicitada, servicios));
+        Metricas metricasDelMes = analiticaClient.metricas(fechaSolicitada.withDayOfMonth(1), fechaSolicitada);
+        return new PanelRecepcion(fechaSolicitada, negocio, citas, metricasDelMes);
     }
 
     @QueryMapping
@@ -48,12 +51,6 @@ public class PanelController {
 
     @QueryMapping
     public Metricas metricas(@Argument LocalDate desde, @Argument LocalDate hasta) {
-        return metricasSinAnalitica(desde, List.of());
-    }
-
-    private Metricas metricasSinAnalitica(LocalDate fecha, List<Servicio> servicios) {
-        // TODO: conectar analitica-service cuando exista.
-        return new Metricas(fecha.withDayOfMonth(1), fecha, 0, 0, 0, 0,
-                0.0, 0.0, List.of());
+        return analiticaClient.metricas(desde, hasta);
     }
 }
