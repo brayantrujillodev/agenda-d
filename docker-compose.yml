@@ -140,7 +140,7 @@ services:
       AGENDAD_CANAL_POR_DEFECTO: REGISTRO
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
-      - "8088:8080"
+      - "8082:8082"          # application.yml fija server.port: 8082
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }

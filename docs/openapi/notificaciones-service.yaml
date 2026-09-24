@@ -1,0 +1,64 @@
+openapi: 3.0.3
+
+info:
+  title: AGENDA-D · notificaciones-service
+  version: 1.0.0
+  description: |
+    Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
+
+    **Este servicio no tiene una API de negocio.** Es un consumidor puro de
+    Kafka: escucha `citas.reservadas`, `citas.canceladas` y `citas.estado`,
+    deduplica por `eventoId` contra `evento_procesado` y envía el aviso al
+    cliente (hoy solo el canal `REGISTRO`, que guarda el mensaje en BD sin
+    costo). Su contrato real son los eventos que consume — documentados en
+    [`docs/eventos/CONTRATO-EVENTOS.md`](../eventos/CONTRATO-EVENTOS.md) —
+    no un endpoint REST.
+
+    Lo único que expone por HTTP es la superficie operativa estándar de
+    Spring Boot Actuator, para que Docker Compose y quien lo despliegue
+    puedan comprobar que está vivo.
+
+servers:
+  - url: http://localhost:8082
+    description: Local (perfil full o levantado por nombre)
+
+tags:
+  - name: Operación
+    description: Superficie HTTP operativa (no hay API de negocio)
+
+paths:
+
+  /actuator/health:
+    get:
+      tags: [Operación]
+      summary: Estado del servicio
+      responses:
+        '200':
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Salud'
+              example:
+                status: UP
+
+  /actuator/info:
+    get:
+      tags: [Operación]
+      summary: Metadatos de la build
+      responses:
+        '200':
+          description: Información de la aplicación
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  schemas:
+    Salud:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [UP, DOWN]

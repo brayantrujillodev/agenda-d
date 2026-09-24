@@ -1,0 +1,98 @@
+openapi: 3.0.3
+
+info:
+  title: AGENDA-D · gateway-graphql
+  version: 1.0.0
+  description: |
+    Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
+
+    **Este servicio expone GraphQL, no REST.** Su contrato real es
+    [`docs/graphql/schema.graphqls`](../graphql/schema.graphqls) (también
+    empaquetado en `gateway-graphql/src/main/resources/graphql/`), servido
+    en `POST /graphql`, con **GraphiQL** habilitado en `/graphiql` para
+    explorarlo de forma interactiva.
+
+    Este archivo OpenAPI documenta únicamente la superficie HTTP que sí es
+    REST: el endpoint de GraphQL como operación POST, y la superficie
+    operativa de Actuator. No reemplaza al esquema GraphQL.
+
+servers:
+  - url: http://localhost:8080
+    description: Local (perfil full o levantado por nombre)
+
+tags:
+  - name: GraphQL
+    description: Único punto de entrada de negocio del gateway
+  - name: Operación
+    description: Superficie HTTP operativa
+
+paths:
+
+  /graphql:
+    post:
+      tags: [GraphQL]
+      summary: Ejecutar una consulta o mutación GraphQL
+      description: |
+        Único endpoint de negocio del gateway. El contrato de qué se puede
+        pedir (`panelRecepcion`, `negocio`, `agenda`, `metricas`,
+        `bloqueos`, y las mutaciones de configuración) vive en el esquema
+        GraphQL, no aquí.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                variables:
+                  type: object
+            example:
+              query: "{ panelRecepcion { fecha negocio { nombre } citasDelDia { horaLocal clienteNombre estado } } }"
+      responses:
+        '200':
+          description: Respuesta GraphQL (puede incluir `data` y/o `errors`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                  errors:
+                    type: array
+                    items:
+                      type: object
+
+  /graphiql:
+    get:
+      tags: [GraphQL]
+      summary: Explorador interactivo del esquema (solo para desarrollo)
+      responses:
+        '200':
+          description: Página HTML de GraphiQL
+
+  /actuator/health:
+    get:
+      tags: [Operación]
+      summary: Estado del servicio
+      responses:
+        '200':
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Salud'
+              example:
+                status: UP
+
+components:
+  schemas:
+    Salud:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [UP, DOWN]

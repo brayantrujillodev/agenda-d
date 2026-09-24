@@ -22,8 +22,6 @@ tags:
     description: El cliente opera su propia cita con un token
   - name: Agenda
     description: Jornada del profesional y registro de asistencia
-  - name: Métricas
-    description: Indicadores del negocio
 
 paths:
 
@@ -325,46 +323,9 @@ paths:
         '404':
           $ref: '#/components/responses/NoEncontrado'
 
-  # ---------------------------------------------------------------
-  # 8. GET /v1/metricas
-  # ---------------------------------------------------------------
-  /v1/metricas:
-    get:
-      tags: [Métricas]
-      summary: Indicadores del negocio en un periodo
-      parameters:
-        - $ref: '#/components/parameters/NegocioId'
-        - name: desde
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-        - name: hasta
-          in: query
-          required: true
-          schema:
-            type: string
-            format: date
-      responses:
-        '200':
-          description: Métricas del periodo
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Metricas'
-              example:
-                desde: '2026-08-01'
-                hasta: '2026-08-31'
-                totalCitas: 184
-                atendidas: 160
-                noAsistio: 18
-                canceladas: 6
-                ocupacion: 72.5
-                tasaInasistencia: 9.8
-        '400':
-          $ref: '#/components/responses/PeticionInvalida'
-
+# ===================================================================
+# GET /v1/metricas vive en analitica-service (docs/openapi/analitica-service.yaml),
+# no aquí. Este servicio no calcula indicadores agregados.
 # ===================================================================
 
 components:
@@ -508,30 +469,6 @@ components:
         estado:
           type: string
           enum: [CONFIRMADA, CANCELADA, ATENDIDA, NO_ASISTIO]
-
-    Metricas:
-      type: object
-      properties:
-        desde:
-          type: string
-          format: date
-        hasta:
-          type: string
-          format: date
-        totalCitas:
-          type: integer
-        atendidas:
-          type: integer
-        noAsistio:
-          type: integer
-        canceladas:
-          type: integer
-        ocupacion:
-          type: number
-          description: Porcentaje 0-100
-        tasaInasistencia:
-          type: number
-          description: Porcentaje 0-100
 
     ConflictoCupo:
       type: object
