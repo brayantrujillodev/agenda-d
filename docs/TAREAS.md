@@ -13,7 +13,7 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
-## Estado y próximos pasos · 2026-09-24
+## Estado y próximos pasos · 2026-09-25
 
 **Fase 2 cerrada de punta a punta.** El circuito completo funciona: REST →
 persistencia → outbox → Kafka → `notificaciones-service` consumiendo →
@@ -25,12 +25,16 @@ porque Luis no está activo y el resto del equipo necesitaba la pieza para
 seguir probando el panel completo. `panelRecepcion.metricasDelMes` y la
 query `metricas` ya resuelven contra datos reales, no contra el stub fijo.
 
+**La prueba de concurrencia obligatoria (#17) también está cerrada**: 100
+hilos reales contra Postgres real, 1 éxito y 99 rechazados. Encontró un bug
+real (deadlocks bajo contención extrema) que ya está corregido — ver #17
+más abajo.
+
 Luis y Johan siguen sin contribuir activamente. El resto del equipo sigue
 con lo que queda de Fase 3:
 
 | Quién | Qué tiene pendiente ahora mismo | Nota |
 |---|---|---|
-| **Brayan** | #17 · Testcontainers + prueba de concurrencia — es la única pieza de Fase 3 que `CLAUDE.md` marca obligatoria y que nunca se borra | Camino crítico para la sustentación |
 | **Andrés** | #16 · Reintentos y DLQ; #21 · Separación entre negocios | Ya activo, sigue con lo suyo |
 | **Johan** | #18 · Recordatorio 24h; #20 · PWA panel de recepción — sin arrancar | Retomar si vuelve a estar disponible; si no, se recortan (🟡 y 🟢) |
 
@@ -329,12 +333,38 @@ Tres reintentos con espera creciente, luego `citas.dlq`. Endpoint que lista lo
 caído y alerta en el panel. **Aceptación:** un consumidor que falla siempre
 deja el mensaje en la DLQ y no bloquea la partición.
 
-### 🟡 #17 · Pruebas con Testcontainers
+### ✅ #17 · Prueba de concurrencia con Testcontainers — cerrado (parcial)
 
 **Asignado:** Brayan · **Depende de:** #8
-Postgres y Kafka reales. Incluye la **prueba de concurrencia**: 100 hilos sobre
-el mismo cupo, 1 con 201 y 99 con 409. **Aceptación:** pasa 10 veces seguidas.
-**No se borra ni se marca `@Disabled` nunca.**
+
+- [x] `ReservaConcurrenciaTest`: 100 hilos reales contra Postgres real
+      (Testcontainers, no H2 ni mocks) reservando el mismo cupo al mismo
+      tiempo, cada uno con su propia `Idempotency-Key`
+- [x] **Aceptación cumplida:** 1 éxito, 99 rechazados por `cita_sin_solape`
+- [ ] "Pasa 10 veces seguidas" — solo confirmado 1 vez en CI hasta ahora.
+      Antes de la sustentación, vale la pena relanzar el job del CI varias
+      veces más para tener esa confianza (`gh workflow run build.yml` o
+      reabrir el PR ya mergeado)
+
+**No se borra ni se marca `@Disabled` nunca** (CLAUDE.md).
+
+> **Hallazgo real de esta prueba:** bajo 100 hilos genuinamente
+> simultáneos, Postgres no siempre resuelve el choque como la violación
+> limpia de `cita_sin_solape` — a veces lo resuelve como **deadlock**
+> (SQLSTATE 40P01) entre las comprobaciones del índice GiST, algo que
+> `PersistenciaReserva`/`ReservaService` no manejaban. Se agregó un
+> reintento acotado (hasta 8 intentos) con espera aleatoria entre cada
+> uno (backoff con jitter) en `ReservaService.crearConReintentos`: sin la
+> espera, los mismos hilos volvían a chocar en el mismo instante y
+> encadenaban deadlock tras deadlock. Con la espera, cero deadlocks en la
+> corrida limpia. Sin Testcontainers con hilos reales, este caso nunca se
+> habría encontrado — un mock nunca deadlockea.
+>
+> **No se pudo correr en verde en Windows** (esta máquina): el transporte
+> por named pipe de `docker-java` no negocia bien la versión de la API
+> contra Docker Desktop reciente. Confirmado que no es un problema del
+> código: `docker info`/`docker ps` funcionan perfectamente por el mismo
+> pipe. CI corre en Linux (socket Unix normal) y ahí sí pasa limpio.
 
 ### 🟡 #18 · Recordatorio de 24 horas
 
