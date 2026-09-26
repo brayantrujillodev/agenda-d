@@ -24,7 +24,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -39,6 +41,8 @@ import org.springframework.stereotype.Service;
 public class ReservaService {
 
     private static final int MAX_ALTERNATIVAS = 5;
+    private static final int INTENTOS_ANTE_DEADLOCK = 8;
+    private static final int ESPERA_MAXIMA_MS = 25;
     private static final DateTimeFormatter HORA_LOCAL = DateTimeFormatter.ofPattern("HH:mm");
 
     private final NegocioRepository negocioRepo;
@@ -109,7 +113,7 @@ public class ReservaService {
                 correlacion(correlationId));
 
         try {
-            PersistenciaReserva.Resultado r = persistencia.crear(datos);
+            PersistenciaReserva.Resultado r = crearConReintentos(datos);
             return new CitaCreadaResponse(
                     r.citaId(), r.inicio(), r.fin(), horaLocal(r.inicio(), zona),
                     servicio.getNombre(), profesional.getNombre(),
@@ -121,6 +125,47 @@ public class ReservaService {
                     .orElseThrow(() -> new IllegalStateException(
                             "Colisión de idempotencia sin cita registrada para " + idempotencyKey));
             return aRespuesta(ganadora, negocio);
+        }
+    }
+
+    /**
+     * Bajo concurrencia muy alta sobre el mismo cupo, Postgres a veces
+     * resuelve el choque de {@code cita_sin_solape} como un deadlock
+     * (SQLSTATE 40P01, {@link CannotAcquireLockException}) entre las
+     * comprobaciones del índice GiST, en vez de la violación limpia de la
+     * restricción. Es transitorio: una transacción nueva, sin las locks
+     * cruzadas de la anterior, resuelve en el siguiente intento — como
+     * éxito real o como {@link PersistenciaReserva.Solape} real. Agotados
+     * los intentos, se trata igual que un solape (más alternativas, nunca
+     * un error genérico de servidor para lo que en el fondo es "este cupo
+     * está muy disputado ahora mismo").
+     *
+     * <p>Entre intento e intento se espera un poco al azar (backoff con
+     * jitter): reintentar de inmediato sin esperar hace que los mismos
+     * hilos vuelvan a chocar en el mismo instante y encadenen deadlock tras
+     * deadlock — se comprobó exactamente eso con 100 hilos reales antes de
+     * agregar la espera.
+     */
+    private PersistenciaReserva.Resultado crearConReintentos(PersistenciaReserva.Datos datos) {
+        for (int intento = 1; intento <= INTENTOS_ANTE_DEADLOCK; intento++) {
+            try {
+                return persistencia.crear(datos);
+            } catch (CannotAcquireLockException e) {
+                if (intento == INTENTOS_ANTE_DEADLOCK) {
+                    throw new PersistenciaReserva.Solape();
+                }
+                esperarUnPocoAlAzar();
+            }
+        }
+        throw new IllegalStateException("Inalcanzable: el bucle siempre retorna o lanza.");
+    }
+
+    private void esperarUnPocoAlAzar() {
+        try {
+            Thread.sleep(ThreadLocalRandom.current().nextInt(1, ESPERA_MAXIMA_MS));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrumpido esperando para reintentar la reserva", e);
         }
     }
 
