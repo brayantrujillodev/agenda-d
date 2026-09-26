@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 public class ReservaService {
 
     private static final int MAX_ALTERNATIVAS = 5;
+    private static final int INTENTOS_ANTE_DEADLOCK = 3;
     private static final DateTimeFormatter HORA_LOCAL = DateTimeFormatter.ofPattern("HH:mm");
 
     private final NegocioRepository negocioRepo;
@@ -109,7 +111,7 @@ public class ReservaService {
                 correlacion(correlationId));
 
         try {
-            PersistenciaReserva.Resultado r = persistencia.crear(datos);
+            PersistenciaReserva.Resultado r = crearConReintentos(datos);
             return new CitaCreadaResponse(
                     r.citaId(), r.inicio(), r.fin(), horaLocal(r.inicio(), zona),
                     servicio.getNombre(), profesional.getNombre(),
@@ -122,6 +124,31 @@ public class ReservaService {
                             "Colisión de idempotencia sin cita registrada para " + idempotencyKey));
             return aRespuesta(ganadora, negocio);
         }
+    }
+
+    /**
+     * Bajo concurrencia muy alta sobre el mismo cupo, Postgres a veces
+     * resuelve el choque de {@code cita_sin_solape} como un deadlock
+     * (SQLSTATE 40P01, {@link CannotAcquireLockException}) entre las
+     * comprobaciones del índice GiST, en vez de la violación limpia de la
+     * restricción. Es transitorio: una transacción nueva, sin las locks
+     * cruzadas de la anterior, resuelve en el siguiente intento — como
+     * éxito real o como {@link PersistenciaReserva.Solape} real. Agotados
+     * los intentos, se trata igual que un solape (más alternativas, nunca
+     * un error genérico de servidor para lo que en el fondo es "este cupo
+     * está muy disputado ahora mismo").
+     */
+    private PersistenciaReserva.Resultado crearConReintentos(PersistenciaReserva.Datos datos) {
+        for (int intento = 1; intento <= INTENTOS_ANTE_DEADLOCK; intento++) {
+            try {
+                return persistencia.crear(datos);
+            } catch (CannotAcquireLockException e) {
+                if (intento == INTENTOS_ANTE_DEADLOCK) {
+                    throw new PersistenciaReserva.Solape();
+                }
+            }
+        }
+        throw new IllegalStateException("Inalcanzable: el bucle siempre retorna o lanza.");
     }
 
     private List<CupoResponse> alternativas(Negocio negocio, Servicio servicio, Profesional profesional,
