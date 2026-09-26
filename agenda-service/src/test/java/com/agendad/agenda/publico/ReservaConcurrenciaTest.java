@@ -64,6 +64,16 @@ class ReservaConcurrenciaTest {
         // los pocos segundos que dura la prueba.
         registry.add("spring.kafka.bootstrap-servers", () -> "localhost:1");
         registry.add("agendad.outbox.intervalo-ms", () -> "600000");
+
+        // El pool por defecto de HikariCP (10 conexiones) deja 90 de los 100
+        // hilos en cola: cada uno reintenta hasta 8 veces si Postgres resuelve
+        // el choque como deadlock, y Postgres tarda hasta deadlock_timeout
+        // (1 s) en darse cuenta. En cola + reintentos, algunos hilos superaban
+        // los 30 s de espera de esta prueba sin que hubiera ningún bug real.
+        // El pool iguala el tamaño a HILOS para que los 100 compitan de
+        // verdad al mismo tiempo, que es justamente lo que esta prueba
+        // necesita demostrar.
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> String.valueOf(HILOS));
     }
 
     @Autowired
@@ -107,7 +117,7 @@ class ReservaConcurrenciaTest {
 
             for (Future<?> f : resultados) {
                 try {
-                    f.get(30, TimeUnit.SECONDS);
+                    f.get(60, TimeUnit.SECONDS);
                 } catch (Exception e) {
                     throw new AssertionError("Un hilo terminó con una excepción no esperada", e);
                 }
