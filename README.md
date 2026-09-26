@@ -74,7 +74,7 @@ imagen publicada.)
 >
 > Sigue pendiente para Fase 3: DLQ y reintentos, y el recordatorio de 24 h
 > con recuperación tras reinicio.
-
+>
 > **Avance · 2026-09-25.** Se cerró la única pieza de Fase 3 que
 > `CLAUDE.md` marca como obligatoria: la prueba de concurrencia con
 > Testcontainers (`agenda-service/.../ReservaConcurrenciaTest`) — 100
