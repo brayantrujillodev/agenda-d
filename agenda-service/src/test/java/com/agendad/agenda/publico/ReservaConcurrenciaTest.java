@@ -41,7 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class ReservaConcurrenciaIT {
+class ReservaConcurrenciaTest {
 
     private static final int HILOS = 100;
 
