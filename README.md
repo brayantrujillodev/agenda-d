@@ -72,9 +72,24 @@ imagen publicada.)
 > `mvn spring-boot:run` contra Postgres/Kafka en Docker (`--profile infra`),
 > sin empaquetarlos en contenedor — ver "Arranque sin Docker" más abajo.
 >
-> Sigue pendiente para Fase 3: DLQ y reintentos, Testcontainers con la
-> prueba de concurrencia, y el recordatorio de 24 h con recuperación tras
-> reinicio.
+> Sigue pendiente para Fase 3: DLQ y reintentos, y el recordatorio de 24 h
+> con recuperación tras reinicio.
+
+> **Avance · 2026-09-25.** Se cerró la única pieza de Fase 3 que
+> `CLAUDE.md` marca como obligatoria: la prueba de concurrencia con
+> Testcontainers (`agenda-service/.../ReservaConcurrenciaTest`) — 100
+> hilos reales contra un Postgres real intentando reservar el mismo cupo
+> al mismo tiempo, 1 éxito y 99 rechazados por `cita_sin_solape`. La
+> prueba encontró un bug real: bajo esa contención extrema, Postgres a
+> veces resuelve el choque como **deadlock** en vez de la violación limpia
+> de la restricción, algo que el código no manejaba. Se corrigió con un
+> reintento acotado (hasta 8 intentos) con espera aleatoria entre cada uno
+> en `ReservaService` — sin la espera, los mismos hilos volvían a chocar
+> en el mismo instante y encadenaban deadlock tras deadlock. Confirmado en
+> verde en el CI (Linux). No se pudo correr en la máquina de desarrollo
+> (Windows): un problema de compatibilidad entre Testcontainers y el
+> transporte por named pipe de Docker Desktop, ajeno al código — `docker
+> info`/`docker ps` funcionan bien por el mismo pipe.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
 
 ---
@@ -271,7 +286,8 @@ Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
 
 - [ ] DLQ con reintentos y espera creciente
 - [ ] Idempotencia verificada
-- [ ] Testcontainers con la prueba de concurrencia (100 hilos)
+- [x] Testcontainers con la prueba de concurrencia (100 hilos) — encontró y
+      corrigió un deadlock real bajo contención extrema
 - [ ] Recordatorio de 24 h con recuperación tras reinicio
 - [x] `analitica-service` — adelantado; falta el panel de recepción en la PWA
 - [ ] Prueba de separación entre negocios
