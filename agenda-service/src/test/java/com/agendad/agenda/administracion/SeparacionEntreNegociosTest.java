@@ -71,7 +71,8 @@ class SeparacionEntreNegociosTest {
                 INSERT INTO agenda.cita
                     (id, negocio_id, servicio_id, profesional_id, inicio, fin, cliente_nombre, cliente_celular)
                 VALUES (?, ?, ?, ?, ?, ?, 'Cliente de negocio A', '3001112233')
-                """, citaDeLaura, NEGOCIO_A, SERVICIO_CORTE, PROFESIONAL_LAURA, inicio, inicio.plusSeconds(3600));
+                """, citaDeLaura, NEGOCIO_A, SERVICIO_CORTE, PROFESIONAL_LAURA,
+                java.sql.Timestamp.from(inicio), java.sql.Timestamp.from(inicio.plusSeconds(3600)));
     }
 
     @Test
