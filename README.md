@@ -21,12 +21,12 @@ El sistema opera como si el usuario ya estuviera autenticado.
 
 ## Estado actual
 
-**Fase 2 cerrada.** El circuito REST → persistencia → outbox → Kafka →
-`notificaciones-service` → gateway GraphQL (`panelRecepcion`) está cerrado y
-**verificado a mano contra Docker real**: los seis contenedores arriba,
-una cita reservada por `POST /v1/publico/{slug}/citas` y confirmada tal
-cual en la respuesta de `panelRecepcion` — no son datos de ejemplo.
-Detalle de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
+**Las tres fases están cerradas.** El circuito REST → persistencia → outbox
+→ Kafka → `notificaciones-service` → gateway GraphQL (`panelRecepcion`) está
+**verificado a mano contra Docker real**, y encima de eso: reintentos con
+DLQ, recordatorio de 24 h con recuperación tras reinicio, panel de
+recepción en la PWA y la prueba de separación entre negocios — el backlog
+completo de `docs/TAREAS.md`.
 
 | Componente | Estado |
 |---|---|
@@ -35,10 +35,12 @@ Detalle de tareas y dueños en [`docs/TAREAS.md`](docs/TAREAS.md).
 | Contratos OpenAPI, GraphQL y de eventos | ✅ en el repo (`docs/`) |
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
 | `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
-| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`, deduplica por `eventoId` ([#9](../../pull/9)) |
+| `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`/`citas.estado`, deduplica por `eventoId`, reintentos + DLQ (`citas.dlq`), recordatorio de 24h con recuperación tras reinicio ([#9](../../pull/9), [#32](../../pull/32), [#33](../../pull/33)) |
 | `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, verificado con una reserva real de punta a punta ([#14](../../pull/14), fix de URI en [#23](../../pull/23)) |
-| `analitica-service` | ✅ consume los tres tópicos, actualiza `metrica_diaria`, `GET /v1/metricas` — adelantado de Fase 3, ver nota |
+| `analitica-service` | ✅ consume los tres tópicos, actualiza `metrica_diaria`, `GET /v1/metricas`, reintentos + DLQ compartida con notificaciones-service |
 | PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
+| PWA · panel de recepción | ✅ agenda del día + métricas + alerta de DLQ en una sola consulta GraphQL, verificado en navegador real ([#34](../../pull/34)) |
+| Prueba de separación entre negocios | ✅ contra Postgres real, Testcontainers ([#31](../../pull/31)) |
 
 **Release publicado:** [`v1.0.2`](../../releases/tag/v1.0.2) — imágenes de
 `agenda-service`, `notificaciones-service` y `gateway-graphql` en GHCR.
@@ -91,6 +93,30 @@ imagen publicada.)
 > transporte por named pipe de Docker Desktop, ajeno al código — `docker
 > info`/`docker ps` funcionan bien por el mismo pipe.
 > Reparto activo: un servicio por persona (ver [`docs/EQUIPO.md`](docs/EQUIPO.md)).
+>
+> **Avance · 2026-09-28 — Fase 3 cerrada.** Las cinco tareas que quedaban se
+> terminaron y mergearon: reintentos con backoff exponencial + DLQ en
+> `citas.dlq` (#16, [PR #32](../../pull/32)); recordatorio de 24h con
+> recuperación tras reinicio (#18, [PR #33](../../pull/33)); panel de
+> recepción en la PWA con alerta de mensajes caídos (#20,
+> [PR #34](../../pull/34)); prueba de separación entre negocios contra
+> Postgres real (#21, [PR #31](../../pull/31)); y esta actualización de
+> documentación (#22).
+>
+> La DLQ encontró un bug real con datos reales: la primera reserva después
+> de agregar el recordatorio cayó en `citas.dlq` porque
+> `notificaciones.programacion.canal` era `NOT NULL` desde la migración
+> original, y el recordatorio es la primera fila que de verdad queda
+> pendiente sin canal (antes, toda fila se creaba y enviaba en la misma
+> transacción). Se corrigió con una migración nueva
+> (`V3__canal_opcional_mientras_pendiente.sql`) y se confirmó reservando de
+> nuevo. La prueba de concurrencia (#17) también encontró un segundo caso
+> bajo más carga de CI: el cálculo de "cupos más cercanos" del `409` podía
+> deadlockear igual que el `INSERT`, sin tener su protección — corregido
+> respondiendo el `409` sin alternativas en ese caso en vez de un error
+> genérico. Ninguno de los dos se habría encontrado sin probar contra
+> Kafka/Postgres reales bajo carga real, que es justamente la regla del
+> proyecto de no mockear esas pruebas.
 
 ---
 
@@ -282,15 +308,17 @@ Capacidad real: ~20 horas semanales entre los cuatro.
 Cada pieza en su versión más simple. Lo importante es que el circuito cierre.
 Detalle y dueño de cada tarea pendiente: [`docs/TAREAS.md`](docs/TAREAS.md).
 
-### Fase 3 · Semanas 11–15 · Robustez
+### Fase 3 · Semanas 11–15 · Robustez — ✅ cerrada
 
-- [ ] DLQ con reintentos y espera creciente
-- [ ] Idempotencia verificada
+- [x] DLQ con reintentos y espera creciente
+- [x] Idempotencia verificada (`Idempotency-Key` en `POST /citas`,
+      deduplicación por `eventoId` en los consumidores)
 - [x] Testcontainers con la prueba de concurrencia (100 hilos) — encontró y
-      corrigió un deadlock real bajo contención extrema
-- [ ] Recordatorio de 24 h con recuperación tras reinicio
-- [x] `analitica-service` — adelantado; falta el panel de recepción en la PWA
-- [ ] Prueba de separación entre negocios
+      corrigió un deadlock real bajo contención extrema, y un segundo
+      deadlock en el cálculo de alternativas bajo más carga de CI
+- [x] Recordatorio de 24 h con recuperación tras reinicio
+- [x] `analitica-service`, con el panel de recepción en la PWA consumiéndolo
+- [x] Prueba de separación entre negocios
 
 ### Semana 15
 
