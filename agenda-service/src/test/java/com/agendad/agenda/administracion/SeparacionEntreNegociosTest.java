@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -26,9 +27,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * esta prueba. El aislamiento no es opcional ni de "buena fe": lo
  * comprueban {@code findByIdAndNegocioId} en los repositorios, y esta
  * prueba demuestra que de verdad se aplica, no solo que compila.
+ *
+ * <p>{@code @Transactional}: cada método revierte sus inserciones al
+ * terminar, para que el {@code @BeforeEach} de un método no choque con la
+ * cita que dejó el anterior (misma franja horaria, mismo profesional).
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@Transactional
 class SeparacionEntreNegociosTest {
 
     @Container
