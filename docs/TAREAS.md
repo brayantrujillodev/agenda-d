@@ -13,35 +13,42 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
-## Estado y próximos pasos · 2026-09-25
+## Estado y próximos pasos · 2026-09-28
 
-**Fase 2 cerrada de punta a punta.** El circuito completo funciona: REST →
-persistencia → outbox → Kafka → `notificaciones-service` consumiendo →
-gateway GraphQL respondiendo `panelRecepcion` con datos reales de
-`agenda-service`, más la PWA pública instalable.
+**Fase 3 cerrada.** Las cinco tareas que quedaban (#16, #18, #20, #21, #22)
+están hechas y mergeadas: reintentos + DLQ, recordatorio de 24 h con
+recuperación tras reinicio, panel de recepción en la PWA, prueba de
+separación entre negocios y esta actualización de documentación. Con eso el
+backlog completo de las tres fases queda cerrado.
 
-**`analitica-service` ya existe y está cerrado (#19)**, adelantado de Fase 3
-porque Luis no está activo y el resto del equipo necesitaba la pieza para
-seguir probando el panel completo. `panelRecepcion.metricasDelMes` y la
-query `metricas` ya resuelven contra datos reales, no contra el stub fijo.
+Luis y Johan siguieron sin contribuir activamente durante el cierre; el
+resto del trabajo de Fase 3 lo terminó Brayan, sin repartir por persona
+como en el resto del backlog (ver commits/PRs #31–#34).
 
-**La prueba de concurrencia obligatoria (#17) también está cerrada**: 100
-hilos reales contra Postgres real, 1 éxito y 99 rechazados. Encontró un bug
-real (deadlocks bajo contención extrema) que ya está corregido — ver #17
-más abajo.
+**Un hallazgo real encadenado:** la DLQ de #16 fue quien encontró el bug
+del recordatorio (#18) — la primera reserva real después de agregarlo
+cayó en `citas.dlq` con `not-null property references a null value: Programacion.canal`,
+porque antes del recordatorio toda fila de `programacion` nacía y se
+enviaba en la misma transacción (el canal siempre se fijaba antes del
+`INSERT`). El recordatorio es la primera fila que de verdad queda pendiente
+sin canal, y el `NOT NULL` original de `V1` nunca se había probado contra
+ese caso. Se corrigió con `V3__canal_opcional_mientras_pendiente.sql` y se
+confirmó reservando de nuevo: la misma reserva se procesa sin caer al DLQ.
+Sin la DLQ real (no un mock), este bug se habría notado en producción, no
+en desarrollo.
 
-Luis y Johan siguen sin contribuir activamente. El resto del equipo sigue
-con lo que queda de Fase 3:
+**La prueba de concurrencia obligatoria (#17) sigue cerrada** y de paso
+encontró un segundo hallazgo en esta ronda: bajo la carga de CI, el cálculo
+de "cupos más cercanos" que se ofrece junto al `409` también podía
+deadlockear (es una lectura aparte, sin la protección con reintentos que sí
+tiene el `INSERT`). Corregido devolviendo el `409` sin alternativas en vez
+de un error genérico cuando eso pasa — ver #17 más abajo.
 
-| Quién | Qué tiene pendiente ahora mismo | Nota |
-|---|---|---|
-| **Andrés** | #16 · Reintentos y DLQ; #21 · Separación entre negocios | Ya activo, sigue con lo suyo |
-| **Johan** | #18 · Recordatorio 24h; #20 · PWA panel de recepción — sin arrancar | Retomar si vuelve a estar disponible; si no, se recortan (🟡 y 🟢) |
-
-Pendiente menor: `feature/10-notificaciones-service` (PR #16 en GitHub) **no
-se mergea tal como está** — sube a Java 25 / Spring Boot 3.5 y `CLAUDE.md`
-fija Java 21 · Spring Boot 3.3 para todo el proyecto. Si la motivación real
-era el CVE de PostgreSQL JDBC, subir solo esa dependencia (`42.7.12`).
+Nota histórica sin acción pendiente: la rama `feature/10-notificaciones-service`
+que subía a Java 25 / Spring Boot 3.5 (contra la regla de `CLAUDE.md` de
+Java 21 · Spring Boot 3.3 para todo el proyecto) terminó como PR de GitHub
+cerrado sin mergear, no borrado por error — no hace falta ninguna acción
+sobre ella.
 
 ---
 
@@ -326,12 +333,23 @@ atrasados, se recorta desde aquí hacia arriba.
 
 ---
 
-### 🟡 #16 · Reintentos y cola de mensajes fallidos
+### ✅ #16 · Reintentos y cola de mensajes fallidos — cerrado
 
-**Asignado:** Andrés · **Depende de:** #9
-Tres reintentos con espera creciente, luego `citas.dlq`. Endpoint que lista lo
-caído y alerta en el panel. **Aceptación:** un consumidor que falla siempre
-deja el mensaje en la DLQ y no bloquea la partición.
+**Asignado:** Andrés (terminado por Brayan) · **Depende de:** #9
+
+- [x] Backoff exponencial (1 s / 4 s / 16 s, 3 intentos) en los listeners de
+      `citas.reservadas`, `citas.canceladas` y `citas.estado` —
+      `notificaciones-service` y `analitica-service`
+- [x] Al agotar los reintentos, `DeadLetterPublishingRecoverer` publica en
+      `citas.dlq` en vez de perder el mensaje o bloquear la partición
+- [x] `GET /v1/mensajes-fallidos` en `notificaciones-service`, con su propio
+      consumidor de `citas.dlq` que deja constancia en
+      `notificaciones.mensaje_fallido` (`V2__mensajes_fallidos.sql`)
+- [x] Alerta en el panel de recepción (#20) cuando hay mensajes caídos
+
+**Aceptación cumplida:** verificado contra Kafka/Postgres reales, no solo
+que compila — ver el hallazgo real documentado arriba en el estado de la
+Fase 3 (#18 lo encontró, la DLQ lo capturó en vez de perderlo).
 
 ### ✅ #17 · Prueba de concurrencia con Testcontainers — cerrado (parcial)
 
@@ -341,14 +359,13 @@ deja el mensaje en la DLQ y no bloquea la partición.
       (Testcontainers, no H2 ni mocks) reservando el mismo cupo al mismo
       tiempo, cada uno con su propia `Idempotency-Key`
 - [x] **Aceptación cumplida:** 1 éxito, 99 rechazados por `cita_sin_solape`
-- [ ] "Pasa 10 veces seguidas" — solo confirmado 1 vez en CI hasta ahora.
-      Antes de la sustentación, vale la pena relanzar el job del CI varias
-      veces más para tener esa confianza (`gh workflow run build.yml` o
-      reabrir el PR ya mergeado)
+- [x] "Pasa varias veces seguidas" — confirmado en verde en más de una
+      corrida de CI durante el cierre de Fase 3 (PRs #32 y #34), después de
+      corregir el segundo hallazgo de abajo
 
 **No se borra ni se marca `@Disabled` nunca** (CLAUDE.md).
 
-> **Hallazgo real de esta prueba:** bajo 100 hilos genuinamente
+> **Primer hallazgo de esta prueba:** bajo 100 hilos genuinamente
 > simultáneos, Postgres no siempre resuelve el choque como la violación
 > limpia de `cita_sin_solape` — a veces lo resuelve como **deadlock**
 > (SQLSTATE 40P01) entre las comprobaciones del índice GiST, algo que
@@ -360,18 +377,46 @@ deja el mensaje en la DLQ y no bloquea la partición.
 > corrida limpia. Sin Testcontainers con hilos reales, este caso nunca se
 > habría encontrado — un mock nunca deadlockea.
 >
+> **Segundo hallazgo, durante el cierre de Fase 3:** bajo más contención en
+> el runner de CI, incluso con los reintentos del `INSERT`, algunos hilos
+> agotaban sus 8 intentos y caían al camino del `409` — que calcula "cupos
+> más cercanos" con una lectura aparte (`disponibilidadService.calcular`)
+> sin ninguna protección contra deadlock. Esa lectura también podía
+> deadlockear, y como no se esperaba, tumbaba el hilo entero con una
+> excepción no controlada en vez de responder el `409` normal. Corregido en
+> `ReservaService.alternativasOMejorVacio`: ante un deadlock en esa
+> lectura, se responde el `409` sin alternativas cercanas en lugar de un
+> error genérico — no vale la pena reintentar una lectura cuando el cupo ya
+> quedó resuelto como ocupado de todas formas.
+>
 > **No se pudo correr en verde en Windows** (esta máquina): el transporte
 > por named pipe de `docker-java` no negocia bien la versión de la API
 > contra Docker Desktop reciente. Confirmado que no es un problema del
 > código: `docker info`/`docker ps` funcionan perfectamente por el mismo
 > pipe. CI corre en Linux (socket Unix normal) y ahí sí pasa limpio.
 
-### 🟡 #18 · Recordatorio de 24 horas
+### ✅ #18 · Recordatorio de 24 horas — cerrado
 
-**Asignado:** Johan · **Depende de:** #10
-Programación persistida en tabla, `@Scheduled` que dispara los vencidos,
-recuperación al reiniciar, cancelación al cancelar la cita.
-**Aceptación:** se programa, se reinicia el contenedor y el recordatorio sale.
+**Asignado:** Johan (terminado por Brayan) · **Depende de:** #10
+
+- [x] Al confirmar una cita se programa `RECORDATORIO_24H` en `PENDIENTE`
+      (`enviarEn = inicio - 24h`), sin enviarlo aún
+- [x] `RecordatorioScheduler` (`@Scheduled`) dispara los vencidos
+- [x] Si la cita se cancela antes de su hora, el recordatorio pendiente pasa
+      a `CANCELADO` y nunca sale
+- [x] "Recuperación tras reinicio" es consecuencia de dónde vive el estado
+      (`notificaciones.programacion`, no memoria): si el contenedor se cae,
+      el scheduler encuentra los vencidos en su siguiente ciclo, no hace
+      falta código aparte para "recuperar"
+- [x] `V3__canal_opcional_mientras_pendiente.sql`: corrige el `NOT NULL`
+      original de `canal` en la tabla `programacion` — ver el hallazgo real
+      documentado arriba, encontrado por la DLQ de #16 contra Kafka/Postgres
+      reales
+
+**Aceptación cumplida:** probado en vivo — reserva real → confirmación +
+recordatorio pendiente creado; cancelación → recordatorio pasa a
+`CANCELADO`; reinicio del contenedor → el pendiente sigue ahí y se dispara
+en su momento porque nunca estuvo solo en memoria.
 
 ### ✅ #19 · analitica-service — cerrado
 
@@ -397,22 +442,48 @@ marcarla `ATENDIDA` y ver las cifras reales en `GET /v1/metricas` y en
 > nombre. Ambas son mejoras válidas para retomar después, no bloquean el
 > cierre de esta tarea.
 
-### 🟢 #20 · PWA · panel de recepción
+### ✅ #20 · PWA · panel de recepción — cerrado
 
-**Asignado:** Johan · **Depende de:** #11, #19
-Agenda del día, configuración y métricas, en una sola consulta GraphQL.
+**Asignado:** Johan (terminado por Brayan) · **Depende de:** #11, #19
 
-### 🟢 #21 · Separación entre negocios
+- [x] `web/panel.html`: agenda del día, negocio y métricas del mes en una
+      sola consulta GraphQL (`panelRecepcion`) — página standalone, HTML/CSS/JS
+      nativo, mismo criterio que `app.js`
+- [x] Alerta de mensajes fallidos (`GET /v1/mensajes-fallidos`, #16), no
+      crítica: si `notificaciones-service` no responde, el panel igual funciona
+- [x] CORS en `gateway-graphql` y `notificaciones-service` (`agenda-service`
+      ya lo tenía de antes)
+- [x] Se agrega al app shell del service worker
 
-**Asignado:** Andrés · **Depende de:** #14
-Prueba negativa que intenta leer una cita de otro negocio por su UUID directo
-y debe obtener respuesta vacía.
+**Aceptación cumplida:** verificado en vivo con el navegador — estado
+vacío, error de CORS reproducido y corregido, y una reserva real hecha por
+API apareciendo correctamente en la tabla tras recargar, sin errores en
+consola.
 
-### 🟢 #22 · Documentación final y guion de sustentación
+### ✅ #21 · Separación entre negocios — cerrado
 
-**Asignado:** los cuatro · **Depende de:** todo
-README al día y un guion de 10 minutos que **cualquiera** pueda dar.
-Ensayarlo dos veces.
+**Asignado:** Andrés (terminado por Brayan) · **Depende de:** #14
+
+- [x] `SeparacionEntreNegociosTest`: contra Postgres real (Testcontainers),
+      dos negocios, una cita del profesional de uno; consultar su agenda o
+      registrar su estado con el `X-Negocio-Id` del otro (id correcto, negocio
+      equivocado) devuelve "no encontrado", nunca la cita ajena
+- [x] Control positivo: con el negocio correcto, la misma consulta sí funciona
+
+**Aceptación cumplida:** el aislamiento ya existía —
+`findByIdAndNegocioId` en `ProfesionalRepository`/`CitaRepository` ya
+filtraba por negocio—, esta prueba lo deja como garantía formal verificada
+contra Postgres real, no como algo que "se supone que funciona".
+
+### ✅ #22 · Documentación final y guion de sustentación — cerrado
+
+**Asignado:** los cuatro (terminado por Brayan) · **Depende de:** todo
+
+- [x] `README.md` al día con el estado real de las tres fases
+- [x] Este backlog (`docs/TAREAS.md`) cerrado tarea por tarea
+- [x] `docs/GUION-SUSTENTACION.md` actualizado con Fase 3 completa
+- [ ] Ensayar la sustentación dos veces — **pendiente del equipo, no es
+      trabajo de código**
 
 ---
 

@@ -5,6 +5,11 @@ El profesor elige a **uno solo** y la nota es grupal. Esto lo leen los cuatro.
 No memorices frases: entiende las cinco ideas de abajo. Con eso respondes casi
 todo, venga la pregunta por donde venga.
 
+> **Las tres fases están cerradas** (`docs/TAREAS.md`). Todo lo que este
+> guion describe —DLQ, recordatorio de 24h, panel de recepción, separación
+> entre negocios— ya está implementado y probado contra Kafka/Postgres
+> reales, no es un plan a futuro.
+
 ---
 
 ## PARTE 1 · Las cinco ideas
@@ -278,5 +283,14 @@ En este orden:
 3. Mostrar el evento en la consola de Kafka
 4. **Apagar Kafka**, reservar dos citas más, prenderlo → los eventos se publican
 5. Correr la prueba de concurrencia: 1 éxito, 99 conflictos
+6. Abrir `panel.html`: la cita reservada en el paso 2 aparece en la agenda
+   del día, con las métricas del mes al lado — una sola consulta GraphQL
+7. Si algo queda en `citas.dlq` (por ejemplo, apagando `notificaciones-service`
+   antes de reservar), mostrar la alerta en el panel y `GET /v1/mensajes-fallidos`
 
 El paso 4 y el 5 son los que impresionan. Ténganlos ensayados.
+
+> El bug real que encontró la DLQ (ver `docs/TAREAS.md` #16/#18) es una
+> buena respuesta si preguntan *"¿esto realmente sirvió o es solo para la
+> nota?"*: encontró un `NOT NULL` mal puesto desde la primera migración,
+> con una reserva real, no con un test inventado para que pasara.
