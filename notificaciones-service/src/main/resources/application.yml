@@ -31,6 +31,9 @@ spring:
 # co.edu.fet.agendad.notificaciones.canal.RegistroCanal.
 agendad:
   canal-por-defecto: ${AGENDAD_CANAL_POR_DEFECTO:REGISTRO}
+  recordatorio:
+    # Cada cuánto RecordatorioScheduler busca recordatorios de 24h vencidos.
+    intervalo-ms: ${AGENDAD_RECORDATORIO_INTERVALO_MS:60000}
 
 management:
   endpoint:

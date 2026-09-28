@@ -28,14 +28,15 @@ spring:
     enabled: true
     default-schema: agenda
     # El perfil 'infra' del Compose ya deja el esquema creado (monta ./db en
-    # el initdb de Postgres, que corre V1 y V2 en orden). Cuando ese es el
-    # caso, Flyway encuentra el esquema poblado y sin su tabla de historial:
-    # baseline-on-migrate lo marca como ya aplicado hasta baseline-version en
-    # vez de reintentar los CREATE y fallar. Sobre una base vacía (sin ese
-    # montaje, p. ej. Testcontainers) Flyway aplica V1 y V2 normalmente.
+    # el initdb de Postgres, que corre V1, V2 y V3 en orden). Cuando ese es
+    # el caso, Flyway encuentra el esquema poblado y sin su tabla de
+    # historial: baseline-on-migrate lo marca como ya aplicado hasta
+    # baseline-version en vez de reintentar los CREATE y fallar. Sobre una
+    # base vacía (sin ese montaje, p. ej. Testcontainers) Flyway aplica
+    # todas las migraciones normalmente.
     # Subir este número cada vez que se agregue una migración nueva a ./db.
     baseline-on-migrate: true
-    baseline-version: 2
+    baseline-version: 3
 
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
