@@ -119,7 +119,7 @@ public class ReservaService {
                     servicio.getNombre(), profesional.getNombre(),
                     EstadoCita.CONFIRMADA.name(), enlaceGestion(r.token()));
         } catch (PersistenciaReserva.Solape e) {
-            throw new CupoOcupado(alternativas(negocio, servicio, profesional, inicio, zona));
+            throw new CupoOcupado(alternativasOMejorVacio(negocio, servicio, profesional, inicio, zona));
         } catch (PersistenciaReserva.CarreraIdempotencia e) {
             Cita ganadora = citaRepo.findByNegocioIdAndIdempotencyKey(negocio.getId(), idempotencyKey)
                     .orElseThrow(() -> new IllegalStateException(
@@ -169,14 +169,26 @@ public class ReservaService {
         }
     }
 
-    private List<CupoResponse> alternativas(Negocio negocio, Servicio servicio, Profesional profesional,
-                                            Instant inicio, ZoneId zona) {
-        LocalDate fecha = inicio.atZone(zona).toLocalDate();
-        return disponibilidadService
-                .calcular(negocio.getSlugPublico(), servicio.getId(), fecha, profesional.getId())
-                .cupos().stream()
-                .limit(MAX_ALTERNATIVAS)
-                .toList();
+    /**
+     * Calcular alternativas es una lectura, no la reserva en sí: bajo la
+     * misma concurrencia extrema que hace deadlockear el INSERT (ver
+     * {@link #crearConReintentos}), esta consulta puede deadlockear
+     * también. No vale la pena reintentarla — el cupo ya está resuelto
+     * como ocupado de todas formas — así que ante un deadlock aquí se
+     * responde el 409 sin alternativas en vez de un error genérico.
+     */
+    private List<CupoResponse> alternativasOMejorVacio(Negocio negocio, Servicio servicio, Profesional profesional,
+                                                        Instant inicio, ZoneId zona) {
+        try {
+            LocalDate fecha = inicio.atZone(zona).toLocalDate();
+            return disponibilidadService
+                    .calcular(negocio.getSlugPublico(), servicio.getId(), fecha, profesional.getId())
+                    .cupos().stream()
+                    .limit(MAX_ALTERNATIVAS)
+                    .toList();
+        } catch (CannotAcquireLockException e) {
+            return List.of();
+        }
     }
 
     private CitaCreadaResponse aRespuesta(Cita cita, Negocio negocio) {
