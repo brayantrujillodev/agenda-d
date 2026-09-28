@@ -6,7 +6,7 @@
  * conexión y no hay cola de reservas offline (dos personas reservando el mismo
  * cupo sin red generan un conflicto irresoluble al sincronizar).
  */
-const CACHE = 'agenda-d-pwa-v2';
+const CACHE = 'agenda-d-pwa-v3';
 
 const APP_SHELL = [
   './',
@@ -20,6 +20,10 @@ const APP_SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
+  // Panel de recepción (docs/TAREAS.md #20) — mismo criterio de app shell.
+  './panel.html',
+  './panel.css',
+  './panel.js',
 ];
 
 self.addEventListener('install', (event) => {

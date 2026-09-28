@@ -27,4 +27,12 @@ window.CONFIG = {
 
   // Solo para pintar el encabezado antes de que carguen los servicios.
   negocioNombre: 'Barbería El Corte',
+
+  // Gateway GraphQL (panel.html, panel de recepción — docs/TAREAS.md #20).
+  // CLAUDE.md expone gateway-graphql en :8080.
+  gatewayUrl: 'http://localhost:8080/graphql',
+
+  // notificaciones-service, para la alerta de mensajes fallidos en el
+  // panel (docs/TAREAS.md #16). CLAUDE.md lo expone en :8082.
+  notificacionesUrl: 'http://localhost:8082',
 };

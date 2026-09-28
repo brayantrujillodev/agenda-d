@@ -1,0 +1,71 @@
+/* AGENDA-D · Panel de recepción · estilos propios, reutiliza tokens de style.css */
+
+.panel-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: .92rem;
+}
+
+.panel-tabla th {
+  text-align: left;
+  color: var(--texto-suave);
+  font-weight: 600;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.panel-tabla td {
+  padding: 10px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.panel-tabla tbody tr:hover { background: var(--verde-tenue); }
+
+.panel-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: .74rem;
+  font-weight: 700;
+  background: var(--verde-tenue);
+  color: var(--verde);
+}
+
+.panel-chip--cancelada { background: rgba(178, 59, 59, .12); color: var(--peligro); }
+.panel-chip--no_asistio { background: rgba(178, 59, 59, .12); color: var(--peligro); }
+.panel-chip--atendida { background: var(--verde-tenue); color: var(--verde); }
+.panel-chip--confirmada { background: var(--verde-tenue); color: var(--verde); }
+
+.panel-metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.panel-metrica {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--r-sm);
+  box-shadow: var(--sombra);
+  padding: 16px;
+  text-align: center;
+}
+
+.panel-metrica__valor {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--verde);
+}
+
+.panel-metrica__etiqueta {
+  display: block;
+  margin-top: 4px;
+  font-size: .78rem;
+  color: var(--texto-suave);
+}

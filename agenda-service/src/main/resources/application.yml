@@ -77,4 +77,5 @@ agendad:
   cors:
     # Orígenes desde los que la PWA (web/) puede llamar esta API por fetch().
     # Separados por coma. Ampliar cuando la PWA se publique en un dominio real.
-    origenes-permitidos: ${AGENDAD_CORS_ORIGENES:http://localhost:5173,http://127.0.0.1:5173}
+    # :5173 es el puerto por defecto de Vite; :5500 el de `npx serve` / Live Server.
+    origenes-permitidos: ${AGENDAD_CORS_ORIGENES:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5500,http://127.0.0.1:5500}
