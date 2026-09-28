@@ -2,31 +2,64 @@ openapi: 3.0.3
 
 info:
   title: AGENDA-D · notificaciones-service
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
 
-    **Este servicio no tiene una API de negocio.** Es un consumidor puro de
-    Kafka: escucha `citas.reservadas`, `citas.canceladas` y `citas.estado`,
-    deduplica por `eventoId` contra `evento_procesado` y envía el aviso al
-    cliente (hoy solo el canal `REGISTRO`, que guarda el mensaje en BD sin
-    costo). Su contrato real son los eventos que consume — documentados en
+    Consumidor puro de Kafka: escucha `citas.reservadas`, `citas.canceladas`
+    y `citas.estado`, deduplica por `eventoId` contra `evento_procesado` y
+    envía el aviso al cliente (hoy solo el canal `REGISTRO`, que guarda el
+    mensaje en BD sin costo). Programa y dispara el recordatorio de 24h
+    (docs/TAREAS.md #18). Su contrato de negocio principal son los eventos
+    que consume — documentados en
     [`docs/eventos/CONTRATO-EVENTOS.md`](../eventos/CONTRATO-EVENTOS.md) —
-    no un endpoint REST.
+    pero desde #16 también expone **un** endpoint REST real: la cola de
+    mensajes fallidos.
 
-    Lo único que expone por HTTP es la superficie operativa estándar de
-    Spring Boot Actuator, para que Docker Compose y quien lo despliegue
-    puedan comprobar que está vivo.
+    Si el listener de cualquiera de los tres tópicos falla, se reintenta
+    tres veces con espera creciente (1 s, 4 s, 16 s) y, agotados los
+    intentos, el mensaje se publica en `citas.dlq`. Este servicio (y solo
+    este, aunque `analitica-service` también reintenta y publica ahí) lo
+    consume y lo deja en `notificaciones.mensaje_fallido` — un solo lugar
+    centraliza "qué cayó", sin importar cuál de los dos consumidores falló.
 
 servers:
   - url: http://localhost:8082
     description: Local (perfil full o levantado por nombre)
 
 tags:
+  - name: Fallidos
+    description: Mensajes que agotaron los reintentos y cayeron en citas.dlq
   - name: Operación
-    description: Superficie HTTP operativa (no hay API de negocio)
+    description: Superficie HTTP operativa
 
 paths:
+
+  /v1/mensajes-fallidos:
+    get:
+      tags: [Fallidos]
+      summary: Lista los mensajes que cayeron en citas.dlq
+      description: |
+        docs/TAREAS.md #16: "Endpoint que lista lo caído y alerta en el
+        panel." Sin autenticación ni filtro por negocio (fuera de alcance
+        del proyecto) — pensado para uso interno del equipo mientras se
+        opera, no para exponerse al negocio final todavía.
+      responses:
+        '200':
+          description: Mensajes fallidos, más reciente primero
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MensajeFallido'
+              example:
+                - id: 6f2a91c4-8b3d-4e21-9f77-2c1a5b8e0d33
+                  topicoOrigen: citas.reservadas
+                  payload: '{"eventoId":"...","citaId":"..."}'
+                  motivo: "No se pudo enviar el registro: conexión rechazada"
+                  intentos: 3
+                  fallidoEn: '2026-09-26T14:32:07Z'
 
   /actuator/health:
     get:
@@ -56,6 +89,27 @@ paths:
 
 components:
   schemas:
+    MensajeFallido:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        topicoOrigen:
+          type: string
+          description: citas.reservadas, citas.canceladas o citas.estado
+        payload:
+          type: string
+          description: El evento original, reserializado a JSON
+        motivo:
+          type: string
+          nullable: true
+        intentos:
+          type: integer
+        fallidoEn:
+          type: string
+          format: date-time
+
     Salud:
       type: object
       properties:
