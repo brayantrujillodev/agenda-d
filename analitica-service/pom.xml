@@ -28,6 +28,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <springdoc.version>2.6.0</springdoc.version>
     </properties>
 
     <dependencies>
@@ -55,6 +56,13 @@
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- Swagger UI en vivo sobre GET /v1/metricas, mismo patrón que agenda-service. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <!-- Pruebas unitarias con Mockito, sin infraestructura real (Testcontainers es Fase 3, #17) -->
