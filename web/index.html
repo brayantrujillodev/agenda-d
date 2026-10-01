@@ -132,14 +132,15 @@
         <label class="campo">
           <span class="campo__etiqueta">Nombre completo</span>
           <input type="text" name="clienteNombre" class="campo__control"
-                 autocomplete="name" minlength="2" maxlength="120" required>
+                 autocomplete="name" minlength="5" maxlength="80" required
+                 placeholder="Nombre y apellido">
           <span class="campo__error" data-error="clienteNombre"></span>
         </label>
 
         <label class="campo">
           <span class="campo__etiqueta">Celular (10 dígitos)</span>
           <input type="tel" name="clienteCelular" class="campo__control"
-                 autocomplete="tel" inputmode="numeric" pattern="[0-9]{10}"
+                 autocomplete="tel" inputmode="numeric" pattern="3[0-9]{9}"
                  maxlength="10" required placeholder="3001234567">
           <span class="campo__error" data-error="clienteCelular"></span>
         </label>

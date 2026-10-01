@@ -28,9 +28,10 @@ class DisponibilidadServiceTest {
     private final HorarioAtencionRepository horarioRepo = mock(HorarioAtencionRepository.class);
     private final BloqueoRepository bloqueoRepo = mock(BloqueoRepository.class);
     private final CitaRepository citaRepo = mock(CitaRepository.class);
+    private final ValidadorCupo validadorCupo = mock(ValidadorCupo.class);
 
     private final DisponibilidadService servicio = new DisponibilidadService(
-            negocioRepo, servicioRepo, profesionalRepo, horarioRepo, bloqueoRepo, citaRepo);
+            negocioRepo, servicioRepo, profesionalRepo, horarioRepo, bloqueoRepo, citaRepo, validadorCupo);
 
     @Test
     void slugDesconocido_devuelve404() {

@@ -84,15 +84,33 @@
     return app;
   }
 
+  // El backend exige que Idempotency-Key sea un UUID. crypto.randomUUID solo
+  // existe en HTTPS o localhost; por http://IP-de-la-red (probar en el
+  // celular) se arma un UUID v4 con getRandomValues, que sí está disponible.
   function nuevaClave() {
-    return (crypto.randomUUID && crypto.randomUUID()) ||
-      ('k-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
   }
+
+  // Mismas reglas que ReservaRequest en docs/openapi/agenda-service.yaml.
+  // Aquí solo sirven para avisar antes de enviar: quien decide es el backend.
+  const PALABRA = "[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*";
+  const RE_NOMBRE = new RegExp(`^${PALABRA}(?: ${PALABRA}){1,5}$`);
+  const RE_CELULAR = /^3[0-9]{9}$/;
+  const DIAS_MAXIMOS_RESERVA = 60;   // agendad.reserva.dias-maximos en agenda-service
+
+  const limpiarNombre = (t) => t.normalize('NFC').trim().replace(/s+/g, ' ');
+  const limpiarCelular = (t) => t.replace(/[s-]/g, '');
 
   const dinero = (n) => '$' + Number(n).toLocaleString('es-CO');
 
-  function hoyLocal() {
+  function hoyLocal(diasAdelante = 0) {
     const d = new Date();
+    d.setDate(d.getDate() + diasAdelante);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
@@ -248,7 +266,8 @@
     const cont = v.querySelector('[data-cupos]');
     const barra = v.querySelector('[data-barra]');
     input.min = hoyLocal();
-    input.value = flujo.fecha && flujo.fecha >= hoyLocal() ? flujo.fecha : hoyLocal();
+    input.max = hoyLocal(DIAS_MAXIMOS_RESERVA);
+    input.value = flujo.fecha && flujo.fecha >= input.min && flujo.fecha <= input.max ? flujo.fecha : hoyLocal();
     input.addEventListener('change', () => cargar());
 
     let seleccion = null;
@@ -347,16 +366,19 @@
     async function enviar() {
       limpiarErrores();
       const datos = new FormData(form);
-      const clienteNombre = (datos.get('clienteNombre') || '').toString().trim();
-      const clienteCelular = (datos.get('clienteCelular') || '').toString().trim();
+      const clienteNombre = limpiarNombre((datos.get('clienteNombre') || '').toString());
+      const clienteCelular = limpiarCelular((datos.get('clienteCelular') || '').toString());
 
       let hayError = false;
-      if (clienteNombre.length < 2 || clienteNombre.length > 120) {
-        erroresDe('clienteNombre').textContent = 'Escribe tu nombre completo.';
+      if (clienteNombre.length < 5 || clienteNombre.length > 80) {
+        erroresDe('clienteNombre').textContent = 'Escribe tu nombre y apellido (entre 5 y 80 caracteres).';
+        hayError = true;
+      } else if (!RE_NOMBRE.test(clienteNombre)) {
+        erroresDe('clienteNombre').textContent = 'Escribe tu nombre y apellido solo con letras, sin números ni símbolos.';
         hayError = true;
       }
-      if (!/^[0-9]{10}$/.test(clienteCelular)) {
-        erroresDe('clienteCelular').textContent = 'El celular debe tener 10 dígitos, sin espacios.';
+      if (!RE_CELULAR.test(clienteCelular)) {
+        erroresDe('clienteCelular').textContent = 'El celular debe tener 10 dígitos y empezar por 3.';
         hayError = true;
       }
       if (hayError) return;
