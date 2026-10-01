@@ -96,6 +96,33 @@ services:
     mem_limit: 384m
     networks: [agenda-net]
 
+  # Ver los datos guardados (citas, outbox, notificaciones, analítica) sin
+  # instalar nada: http://localhost:5050. Sin login y con el servidor
+  # AGENDA-D ya registrado (pgadmin/servers.json). Solo para desarrollo.
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: agd-pgadmin
+    profiles: [infra, full]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@agendad.com
+      PGADMIN_DEFAULT_PASSWORD: agendad
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    # libpq ignora un pgpass con permisos abiertos, y un archivo montado
+    # desde Windows siempre los tiene: se crea dentro con 600 al arrancar.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - echo 'postgres:5432:*:agendad:agendad' > /tmp/pgpass && chmod 600 /tmp/pgpass && exec /entrypoint.sh
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres: { condition: service_healthy }
+    mem_limit: 384m
+    networks: [agenda-net]
+
   # -------------------------------------------------------------------
   # SERVICIOS · definidos, aún sin proyecto
   #

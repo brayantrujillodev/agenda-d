@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "AGENDA-D",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "agendad",
+      "Username": "agendad",
+      "PassFile": "/tmp/pgpass",
+      "SSLMode": "prefer"
+    }
+  }
+}
