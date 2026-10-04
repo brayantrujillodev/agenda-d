@@ -127,15 +127,15 @@ se evalúa.
 ## Comandos
 
 ```bash
-docker compose --profile infra up -d   # postgres + kafka + consola · FUNCIONA HOY
-docker compose --profile core up -d    # + agenda-service (cuando exista el proyecto)
-docker compose --profile full up -d    # todo (cuando existan los cuatro)
+docker compose --profile infra up -d   # postgres + kafka + tópicos + consolas
+docker compose --profile core up -d    # postgres + kafka + tópicos + agenda-service
+docker compose --profile full up -d --build  # todo
 docker compose --profile full down -v  # empezar de cero
 ```
 
-**Los proyectos Java todavía no existen.** Solo `infra` levanta sin errores.
-A medida que crees cada servicio, actualiza la tabla de estado del README:
-el docente ya observó que el README prometía un arranque que no funcionaba.
+Los cuatro proyectos Java existen y los tres perfiles levantan. Si cambia
+algo del arranque, actualiza la tabla de estado del README: el docente ya
+observó que el README prometía un arranque que no funcionaba.
 
 Alguien del equipo tiene 8 GB de RAM: **usa `core` por defecto**.
 

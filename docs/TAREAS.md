@@ -13,6 +13,36 @@ nunca tocan los mismos archivos, para que nadie se pise.
 
 ---
 
+## Entrega 2 del segundo periodo (Kafka) · 2026-10-03
+
+Al recolectar las evidencias del flujo Kafka contra Docker real aparecieron
+tres defectos que las pruebas unitarias (con repositorios simulados) no
+podían ver. Los tres quedaron corregidos y verificados de nuevo en vivo:
+
+1. **El recordatorio de 24 h seguía tumbando cada reserva en
+   `notificaciones-service`.** `V3` hizo opcional la columna `canal`, pero
+   la entidad `Programacion` conservaba `@Column(nullable = false)`:
+   Hibernate rechazaba el recordatorio antes de llegar a la base, la
+   transacción se revertía (también la confirmación) y el evento caía a
+   `citas.dlq` tras 21 s de reintentos. Se acumularon 36 reservas en la DLQ
+   y un atraso de 30 mensajes. Corrección: quitar `nullable = false`.
+2. **Un mensaje que no es JSON bloqueaba la partición.** Sin
+   `ErrorHandlingDeserializer`, el fallo ocurre dentro de `poll()`,
+   `DefaultErrorHandler` no lo puede manejar y el consumidor reintenta el
+   mismo offset sin fin. Ahora va directo a `citas.dlq` (con los bytes
+   originales e `intentos = 1`).
+3. **El relay de outbox podía desordenar eventos.** Con Kafka recién
+   encendido, si un envío fallaba el relay seguía con los siguientes del
+   lote: se observó el outbox 52 publicado antes que el 50 y el 51 (mismo
+   profesional). Ahora corta el lote en el primer fallo
+   (`OutboxRelayTest.siUnEnvioFalla_noPublicaLosPosterioresParaNoAlterarElOrden`).
+
+Además: tópicos declarados explícitamente por `kafka-init` en el Compose
+(3 particiones, 7 días), y logs `INFO` de procesado y de duplicado
+descartado con `eventoId`, `citaId` y `correlationId`.
+
+---
+
 ## Estado y próximos pasos · 2026-09-28
 
 **Fase 3 cerrada.** Las cinco tareas que quedaban (#16, #18, #20, #21, #22)
