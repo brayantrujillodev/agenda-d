@@ -3,8 +3,9 @@ package com.agendad.analitica.config;
 import com.agendad.analitica.evento.EventoCitaCancelada;
 import com.agendad.analitica.evento.EventoCitaEstado;
 import com.agendad.analitica.evento.EventoCitaReservada;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
@@ -18,9 +19,12 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
+import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -80,17 +84,22 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public DeadLetterPublishingRecoverer dlqRecoverer(KafkaTemplate<Object, Object> dlqKafkaTemplate) {
+    public DeadLetterPublishingRecoverer dlqRecoverer(KafkaTemplate<String, Object> dlqKafkaTemplate) {
         return new DeadLetterPublishingRecoverer(dlqKafkaTemplate,
                 (record, ex) -> new TopicPartition(TOPICO_DLQ, -1));
     }
 
     @Bean
-    public KafkaTemplate<Object, Object> dlqKafkaTemplate(KafkaProperties kafkaProperties) {
+    public KafkaTemplate<String, Object> dlqKafkaTemplate(KafkaProperties kafkaProperties) {
         Map<String, Object> propiedades = kafkaProperties.buildProducerProperties(null);
-        propiedades.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        propiedades.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(propiedades));
+        // Un mensaje que ni siquiera era JSON llega aquí como los byte[]
+        // originales (ErrorHandlingDeserializer los conserva): se publican
+        // tal cual. Todo lo demás se reserializa a JSON.
+        Map<Class<?>, Serializer<?>> porTipo = new LinkedHashMap<>();
+        porTipo.put(byte[].class, new ByteArraySerializer());
+        porTipo.put(Object.class, new JsonSerializer<>());
+        Serializer<Object> valor = new DelegatingByTypeSerializer(porTipo, true);
+        return new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(propiedades, new StringSerializer(), valor));
     }
 
     /** Tres reintentos con espera creciente (1 s, 4 s, 16 s), luego {@link #dlqRecoverer}. */
@@ -104,8 +113,15 @@ public class KafkaConsumerConfig {
     }
 
     private <T> ConsumerFactory<String, T> fabricaPara(KafkaProperties kafkaProperties, Class<T> tipoEvento) {
-        JsonDeserializer<T> deserializer = new JsonDeserializer<>(tipoEvento, false);
-        deserializer.addTrustedPackages(PAQUETE_EVENTOS);
+        JsonDeserializer<T> json = new JsonDeserializer<>(tipoEvento, false);
+        json.addTrustedPackages(PAQUETE_EVENTOS);
+        // Sin este envoltorio, un mensaje que no es JSON válido falla dentro
+        // de poll(), antes de llegar al listener: DefaultErrorHandler no
+        // puede manejarlo y el consumidor queda en bucle sobre el mismo
+        // offset, con la partición bloqueada. Envuelto, el fallo llega al
+        // manejador como DeserializationException (no reintentable) y el
+        // mensaje va directo a citas.dlq.
+        ErrorHandlingDeserializer<T> deserializer = new ErrorHandlingDeserializer<>(json);
         Map<String, Object> propiedades = kafkaProperties.buildConsumerProperties(null);
         return new DefaultKafkaConsumerFactory<>(propiedades, new StringDeserializer(), deserializer);
     }
