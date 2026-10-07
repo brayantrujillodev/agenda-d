@@ -3,7 +3,6 @@ package com.agendad.agenda.comun.error;
 import java.time.DateTimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,16 +45,18 @@ public class ManejadorErrores {
                 .body(new ConflictoCupoResponse("CUPO_OCUPADO", e.getMessage(), e.getAlternativas()));
     }
 
-    /** Falla la validación del cuerpo (@Valid): se muestra el primer mensaje, ya redactado en español. */
+    /**
+     * Falla la validación del cuerpo (@Valid): se muestra el primer mensaje, ya
+     * redactado en español, y el nombre del campo para que el cliente lo marque.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public RespuestaError cuerpoInvalido(MethodArgumentNotValidException e) {
-        String detalle = e.getBindingResult().getFieldErrors().stream()
-                .map(DefaultMessageSourceResolvable::getDefaultMessage)
-                .filter(m -> m != null && !m.isBlank())
+        return e.getBindingResult().getFieldErrors().stream()
+                .filter(f -> f.getDefaultMessage() != null && !f.getDefaultMessage().isBlank())
                 .findFirst()
-                .orElse("Revisa los datos de la reserva.");
-        return new RespuestaError("DATOS_INVALIDOS", detalle);
+                .map(f -> new RespuestaError("DATOS_INVALIDOS", f.getDefaultMessage(), f.getField()))
+                .orElse(new RespuestaError("DATOS_INVALIDOS", "Revisa los datos de la reserva."));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

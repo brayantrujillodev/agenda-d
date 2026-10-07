@@ -251,6 +251,41 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
 
   # ---------------------------------------------------------------
+  # 5b. GET /v1/profesionales
+  # ---------------------------------------------------------------
+  /v1/profesionales:
+    get:
+      tags: [Agenda]
+      summary: Profesionales activos del negocio
+      description: |
+        Lo usa el panel de recepción para pedir la agenda de cada
+        profesional sin tener sus ids quemados.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+      responses:
+        '200':
+          description: Profesionales activos, ordenados por nombre
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    nombre:
+                      type: string
+              example:
+                - id: 33333333-3333-3333-3333-333333333334
+                  nombre: Andrés
+                - id: 33333333-3333-3333-3333-333333333333
+                  nombre: Laura
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
   # 6. GET /v1/agenda/{profesionalId}
   # ---------------------------------------------------------------
   /v1/agenda/{profesionalId}:
@@ -281,6 +316,34 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CitaDetalle'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 6b. GET /v1/citas/{id}
+  # ---------------------------------------------------------------
+  /v1/citas/{id}:
+    get:
+      tags: [Agenda]
+      summary: Una cita del negocio
+      description: |
+        Celular completo (es el negocio quien consulta). El gateway lo usa
+        para devolver la cita actualizada tras registrar asistencia o cancelar.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: La cita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitaDetalle'
         '404':
           $ref: '#/components/responses/NoEncontrado'
 
@@ -318,6 +381,35 @@ paths:
       responses:
         '204':
           description: Estado registrado
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 8. POST /v1/citas/{id}/cancelacion
+  # ---------------------------------------------------------------
+  /v1/citas/{id}/cancelacion:
+    post:
+      tags: [Agenda]
+      summary: Cancelar una cita desde el negocio
+      description: |
+        Mismo efecto que `DELETE /v1/gestion/{token}`, pero lo hace el
+        personal desde el panel: libera el cupo y publica
+        `citas.canceladas` con `canceladaPor: NEGOCIO`, que dispara el aviso
+        al cliente. Cancelar una cita ya cancelada responde 204 sin emitir un
+        segundo evento. No se permite sobre una cita con resultado registrado.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Cita cancelada
         '400':
           $ref: '#/components/responses/PeticionInvalida'
         '404':
@@ -490,6 +582,11 @@ components:
         mensaje:
           type: string
           description: En español claro. Nunca un stacktrace.
+        campo:
+          type: string
+          description: |
+            Solo en errores de validación de un campo del cuerpo (ej.
+            `clienteCelular`), para marcarlo junto a su input.
 
   responses:
 

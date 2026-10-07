@@ -1,5 +1,6 @@
 package com.agendad.agenda.administracion;
 
+import com.agendad.agenda.administracion.dto.ProfesionalResponse;
 import com.agendad.agenda.administracion.dto.RegistrarEstadoRequest;
 import com.agendad.agenda.comun.dto.CitaDetalleResponse;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,12 +33,24 @@ public class AgendaController {
         this.agendaService = agendaService;
     }
 
+    @GetMapping("/v1/profesionales")
+    public List<ProfesionalResponse> profesionales(@RequestHeader("X-Negocio-Id") UUID negocioId) {
+        return agendaService.profesionales(negocioId);
+    }
+
     @GetMapping("/v1/agenda/{profesionalId}")
     public List<CitaDetalleResponse> agendaDelDia(
             @RequestHeader("X-Negocio-Id") UUID negocioId,
             @PathVariable UUID profesionalId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         return agendaService.agendaDelDia(negocioId, profesionalId, fecha);
+    }
+
+    @GetMapping("/v1/citas/{id}")
+    public CitaDetalleResponse detalle(
+            @RequestHeader("X-Negocio-Id") UUID negocioId,
+            @PathVariable UUID id) {
+        return agendaService.detalle(negocioId, id);
     }
 
     @PatchMapping("/v1/citas/{id}/estado")
@@ -47,5 +61,14 @@ public class AgendaController {
             @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId,
             @Valid @RequestBody RegistrarEstadoRequest peticion) {
         agendaService.registrarEstado(negocioId, id, peticion.estado(), correlationId);
+    }
+
+    @PostMapping("/v1/citas/{id}/cancelacion")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelar(
+            @RequestHeader("X-Negocio-Id") UUID negocioId,
+            @PathVariable UUID id,
+            @RequestHeader(name = "X-Correlation-Id", required = false) String correlationId) {
+        agendaService.cancelar(negocioId, id, correlationId);
     }
 }
