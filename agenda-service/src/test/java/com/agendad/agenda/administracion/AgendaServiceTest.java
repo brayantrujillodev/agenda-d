@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.agendad.agenda.administracion.dto.ProfesionalResponse;
 import com.agendad.agenda.comun.dto.CitaDetalleResponse;
 import com.agendad.agenda.comun.error.PeticionInvalida;
 import com.agendad.agenda.comun.error.RecursoNoEncontrado;
@@ -19,6 +20,7 @@ import com.agendad.agenda.dominio.Negocio;
 import com.agendad.agenda.dominio.Outbox;
 import com.agendad.agenda.dominio.Profesional;
 import com.agendad.agenda.dominio.Servicio;
+import com.agendad.agenda.outbox.evento.EventoCitaCancelada;
 import com.agendad.agenda.repositorio.CitaRepository;
 import com.agendad.agenda.repositorio.NegocioRepository;
 import com.agendad.agenda.repositorio.OutboxRepository;
@@ -165,5 +167,103 @@ class AgendaServiceTest {
                 o.getTipoEvento().equals("citas.estado")
                         && o.getClaveParticion().equals(PROFESIONAL_ID.toString())
                         && o.getNegocioId().equals(NEGOCIO_ID)));
+    }
+
+    @Test
+    void profesionales_negocioInexistente_devuelve404() {
+        when(negocioRepo.findById(NEGOCIO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.profesionales(NEGOCIO_ID))
+                .isInstanceOf(RecursoNoEncontrado.class);
+    }
+
+    @Test
+    void profesionales_devuelveLosActivosDelNegocio() {
+        when(negocioRepo.findById(NEGOCIO_ID)).thenReturn(Optional.of(mock(Negocio.class)));
+        Profesional laura = mock(Profesional.class);
+        when(laura.getId()).thenReturn(PROFESIONAL_ID);
+        when(laura.getNombre()).thenReturn("Laura");
+        when(profesionalRepo.findByNegocioIdAndActivoTrueOrderByNombre(NEGOCIO_ID)).thenReturn(List.of(laura));
+
+        List<ProfesionalResponse> lista = servicio.profesionales(NEGOCIO_ID);
+
+        assertThat(lista).containsExactly(new ProfesionalResponse(PROFESIONAL_ID, "Laura"));
+    }
+
+    @Test
+    void cancelar_citaInexistente_devuelve404() {
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.cancelar(NEGOCIO_ID, CITA_ID, null))
+                .isInstanceOf(RecursoNoEncontrado.class);
+    }
+
+    @Test
+    void cancelar_citaYaCerrada_devuelve400() {
+        Cita cita = citaConfirmada();
+        cita.marcarResultado(EstadoCita.ATENDIDA);
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(cita));
+
+        assertThatThrownBy(() -> servicio.cancelar(NEGOCIO_ID, CITA_ID, null))
+                .isInstanceOf(PeticionInvalida.class);
+        verify(outboxRepo, never()).save(any());
+    }
+
+    @Test
+    void cancelar_citaYaCancelada_noEmiteSegundoEvento() {
+        Cita cita = citaConfirmada();
+        cita.cancelar();
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(cita));
+
+        servicio.cancelar(NEGOCIO_ID, CITA_ID, null);
+
+        verify(outboxRepo, never()).save(any());
+    }
+
+    @Test
+    void cancelar_ok_cancelaYEncolaEventoPorNegocio() throws JsonProcessingException {
+        Cita cita = citaConfirmada();
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(cita));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        servicio.cancelar(NEGOCIO_ID, CITA_ID, "corr-2");
+
+        assertThat(cita.getEstado()).isEqualTo(EstadoCita.CANCELADA);
+        verify(objectMapper).writeValueAsString(argThat((Object e) ->
+                e instanceof EventoCitaCancelada ev
+                        && EventoCitaCancelada.POR_NEGOCIO.equals(ev.canceladaPor())
+                        && "corr-2".equals(ev.correlationId())));
+        verify(outboxRepo).save(argThat((Outbox o) ->
+                o.getTipoEvento().equals("citas.canceladas")
+                        && o.getClaveParticion().equals(PROFESIONAL_ID.toString())));
+    }
+
+    @Test
+    void detalle_citaDeOtroNegocio_devuelve404() {
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.detalle(NEGOCIO_ID, CITA_ID))
+                .isInstanceOf(RecursoNoEncontrado.class);
+    }
+
+    @Test
+    void detalle_devuelveCelularCompletoYHoraLocal() {
+        Negocio negocio = mock(Negocio.class);
+        when(negocio.getZonaHoraria()).thenReturn("America/Bogota");
+        when(negocioRepo.findById(NEGOCIO_ID)).thenReturn(Optional.of(negocio));
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(citaConfirmada()));
+        Profesional laura = mock(Profesional.class);
+        when(laura.getNombre()).thenReturn("Laura");
+        when(profesionalRepo.findById(PROFESIONAL_ID)).thenReturn(Optional.of(laura));
+        Servicio corte = mock(Servicio.class);
+        when(corte.getNombre()).thenReturn("Corte de cabello");
+        when(servicioRepo.findById(SERVICIO_ID)).thenReturn(Optional.of(corte));
+
+        CitaDetalleResponse detalle = servicio.detalle(NEGOCIO_ID, CITA_ID);
+
+        assertThat(detalle.clienteCelular()).isEqualTo("3001234567");
+        assertThat(detalle.horaLocal()).isEqualTo("10:00");
+        assertThat(detalle.profesionalNombre()).isEqualTo("Laura");
+        assertThat(detalle.servicioNombre()).isEqualTo("Corte de cabello");
     }
 }

@@ -33,9 +33,44 @@
     </a>
   </header>
 
-  <main id="panel" class="contenedor">
-    <p class="cargando">Cargando…</p>
+  <main class="contenedor contenedor--ancho">
+    <div class="vista">
+      <div id="alerta-fallidos" class="panel-alerta" role="status" hidden></div>
+
+      <div class="panel-encabezado">
+        <h1 class="vista__titulo">Agenda del día</h1>
+        <p class="panel-actualizado" id="actualizado" aria-live="polite"></p>
+      </div>
+
+      <div class="panel-dia" role="group" aria-label="Elegir día">
+        <button type="button" class="panel-dia__flecha" data-dia="-1" aria-label="Día anterior">←</button>
+        <input type="date" id="selector-fecha" class="campo__control panel-dia__fecha" aria-label="Fecha">
+        <button type="button" class="panel-dia__flecha" data-dia="1" aria-label="Día siguiente">→</button>
+        <button type="button" class="panel-dia__hoy" id="ir-hoy">Hoy</button>
+      </div>
+
+      <div id="filtro-profesional" class="panel-filtro" role="group" aria-label="Filtrar por profesional"></div>
+
+      <div id="citas"><p class="cargando">Cargando…</p></div>
+
+      <h2 class="vista__titulo panel-subtitulo">Indicadores del mes</h2>
+      <div id="metricas"></div>
+    </div>
   </main>
+
+  <dialog id="dialogo-cancelar" class="dialogo" aria-labelledby="dialogo-cancelar-titulo">
+    <form method="dialog">
+      <h2 id="dialogo-cancelar-titulo" class="dialogo__titulo">¿Cancelar esta cita?</h2>
+      <p class="dialogo__texto" data-detalle></p>
+      <p class="dialogo__texto">El cupo queda libre y al cliente le llega el aviso de cancelación.</p>
+      <div class="dialogo__acciones">
+        <button type="submit" value="no" class="boton boton--secundario">Volver</button>
+        <button type="submit" value="si" class="boton boton--peligro">Sí, cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="aviso" class="panel-aviso" role="status" aria-live="polite" hidden></div>
 
   <footer class="pie">
     <span class="pie__marca">

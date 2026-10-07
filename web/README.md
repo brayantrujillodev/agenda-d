@@ -92,19 +92,35 @@ celular, domingo cerrado. No sustituye probarlo en el navegador.
 | `app.js` | router por hash, vistas y capa de red |
 | `mock.js` | backend simulado con los datos del contrato |
 | `manifest.json` | metadatos de instalación |
-| `sw.js` | service worker: cachea la interfaz, nunca la API |
+| `sw.js` | service worker: cachea la interfaz (red primero en HTML, stale-while-revalidate en el resto), nunca la API |
+| `panel.html` / `panel.js` / `panel.css` | panel de recepción (GraphQL) |
 | `icons/` | íconos generados por `generar-iconos.py` (stdlib, sin deps) |
 | `pruebas/mock.node.mjs` | chequeo del mock contra el contrato, solo con Node |
 
 ## Flujo
 
 ```text
-#/  (paso 1)            elegir servicio  → Continuar
-#/reservar  (paso 2)    elegir día y cupo  → Continuar
-#/datos  (paso 3)       nombre + celular  →  POST /citas
-#/confirmada            enlace de gestión
-#/gestion/{token}       ver / cancelar la cita   (fuera del stepper)
+#/  (paso 1)              elegir servicio  → Continuar
+#/reservar  (paso 2)      día (Hoy, Mañana…), profesional y cupo por franja  → Continuar
+#/datos  (paso 3)         nombre + celular  →  POST /citas
+#/confirmada/{token}      enlace de gestión, .ics, WhatsApp (sobrevive a F5)
+#/gestion/{token}         ver / cancelar la cita   (fuera del stepper)
+#/mis-citas               citas guardadas en este dispositivo (localStorage)
 ```
+
+**Mis citas.** Cada reserva, y cada cita abierta por su enlace, se guarda en
+`localStorage` (`agenda-d.mis-citas`) con su token. Es lo que evita que el
+cliente pierda la única forma de cancelar si recarga o cierra la pestaña. En
+modo privado no se guarda y la app funciona igual.
+
+## Panel de recepción
+
+`panel.html` es la pantalla interna del negocio (no la del cliente). Una sola
+consulta GraphQL a `gateway-graphql` (`panelRecepcion`) trae la agenda del
+día de todos los profesionales y las métricas del mes. Desde ahí se registra
+**Atendió / No asistió** (`registrarAsistencia`) y se **cancela**
+(`cancelarCita`, el cliente recibe el aviso). Se refresca solo cada minuto.
+Necesita `gateway-graphql` en `CONFIG.gatewayUrl`; no tiene mock.
 
 ## Reglas que respeta (CLAUDE.md)
 

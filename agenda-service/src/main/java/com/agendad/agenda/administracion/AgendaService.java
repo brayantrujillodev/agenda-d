@@ -1,5 +1,6 @@
 package com.agendad.agenda.administracion;
 
+import com.agendad.agenda.administracion.dto.ProfesionalResponse;
 import com.agendad.agenda.comun.dto.CitaDetalleResponse;
 import com.agendad.agenda.comun.error.PeticionInvalida;
 import com.agendad.agenda.comun.error.RecursoNoEncontrado;
@@ -9,6 +10,8 @@ import com.agendad.agenda.dominio.Negocio;
 import com.agendad.agenda.dominio.Outbox;
 import com.agendad.agenda.dominio.Profesional;
 import com.agendad.agenda.dominio.Servicio;
+import com.agendad.agenda.outbox.evento.ClienteEvento;
+import com.agendad.agenda.outbox.evento.EventoCitaCancelada;
 import com.agendad.agenda.outbox.evento.EventoCitaEstado;
 import com.agendad.agenda.repositorio.CitaRepository;
 import com.agendad.agenda.repositorio.NegocioRepository;
@@ -57,6 +60,16 @@ public class AgendaService {
         this.objectMapper = objectMapper;
     }
 
+    /** Profesionales activos del negocio, ordenados por nombre. */
+    @Transactional(readOnly = true)
+    public List<ProfesionalResponse> profesionales(UUID negocioId) {
+        negocioRepo.findById(negocioId)
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos ese negocio."));
+        return profesionalRepo.findByNegocioIdAndActivoTrueOrderByNombre(negocioId).stream()
+                .map(p -> new ProfesionalResponse(p.getId(), p.getNombre()))
+                .toList();
+    }
+
     /** Citas del profesional para {@code fecha} (hora local del negocio), ordenadas por hora. */
     @Transactional(readOnly = true)
     public List<CitaDetalleResponse> agendaDelDia(UUID negocioId, UUID profesionalId, LocalDate fecha) {
@@ -90,6 +103,26 @@ public class AgendaService {
                 .toList();
     }
 
+    /** Una cita del negocio con el celular completo, igual que en {@link #agendaDelDia}. */
+    @Transactional(readOnly = true)
+    public CitaDetalleResponse detalle(UUID negocioId, UUID citaId) {
+        Cita c = citaRepo.findByIdAndNegocioId(citaId, negocioId)
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos esa cita en este negocio."));
+        Negocio negocio = negocioRepo.findById(negocioId)
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos ese negocio."));
+        ZoneId zona = ZoneId.of(negocio.getZonaHoraria());
+        String servicioNombre = servicioRepo.findById(c.getServicioId())
+                .map(Servicio::getNombre).orElse(null);
+        String profesionalNombre = profesionalRepo.findById(c.getProfesionalId())
+                .map(Profesional::getNombre).orElse(null);
+        return new CitaDetalleResponse(
+                c.getId(), c.getInicio(), c.getFin(),
+                c.getInicio().atZone(zona).toLocalTime().format(HORA_LOCAL),
+                servicioNombre, profesionalNombre,
+                c.getClienteNombre(), c.getClienteCelular(),
+                c.getEstado().name());
+    }
+
     /**
      * Registra el resultado de una cita ya atendida (o no). No se permite
      * sobre una cita cancelada ni sobre una que ya tenga un resultado.
@@ -121,11 +154,44 @@ public class AgendaService {
                 cita.getNegocioId(), serializar(evento)));
     }
 
-    private String serializar(EventoCitaEstado evento) {
+    /**
+     * Cancela una cita desde el panel del negocio (cliente que llamó, barbero
+     * enfermo…). Mismo efecto que la cancelación por token, pero con
+     * {@code canceladaPor = NEGOCIO}: libera el cupo y publica
+     * {@code citas.canceladas}, que dispara el aviso al cliente. Cancelar dos
+     * veces no emite un segundo evento.
+     */
+    @Transactional
+    public void cancelar(UUID negocioId, UUID citaId, String correlationId) {
+        Cita cita = citaRepo.findByIdAndNegocioId(citaId, negocioId)
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos esa cita en este negocio."));
+
+        if (cita.estaCancelada()) {
+            return;
+        }
+        if (!cita.estaConfirmada()) {
+            throw new PeticionInvalida("Esa cita ya tiene un resultado registrado; no se puede cancelar.");
+        }
+
+        cita.cancelar();
+
+        EventoCitaCancelada evento = new EventoCitaCancelada(
+                UUID.randomUUID(), EventoCitaCancelada.VERSION_ACTUAL, Instant.now(),
+                correlacion(correlationId),
+                cita.getNegocioId(), cita.getId(), cita.getProfesionalId(), cita.getServicioId(),
+                cita.getInicio(), cita.getFin(),
+                EventoCitaCancelada.POR_NEGOCIO,
+                new ClienteEvento(cita.getClienteNombre(), cita.getClienteCelular()));
+
+        outboxRepo.save(new Outbox("citas.canceladas", cita.getProfesionalId().toString(),
+                cita.getNegocioId(), serializar(evento)));
+    }
+
+    private String serializar(Object evento) {
         try {
             return objectMapper.writeValueAsString(evento);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("No se pudo serializar el evento citas.estado", e);
+            throw new IllegalStateException("No se pudo serializar el evento " + evento.getClass().getSimpleName(), e);
         }
     }
 

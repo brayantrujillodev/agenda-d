@@ -1,5 +1,96 @@
 /* AGENDA-D · Panel de recepción · estilos propios, reutiliza tokens de style.css */
 
+/* El panel se usa en el computador de la recepción: más ancho que la PWA. */
+.contenedor--ancho { max-width: 980px; }
+
+.sr-solo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.panel-subtitulo { margin-top: 32px; }
+.panel-periodo { margin-top: 10px; }
+
+/* ---------- Encabezado + navegación de días ---------- */
+
+.panel-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.panel-actualizado { margin: 0; font-size: .82rem; color: var(--texto-suave); }
+
+.panel-dia {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+
+.panel-dia__fecha { width: auto; flex: 0 1 190px; }
+
+.panel-dia__flecha,
+.panel-dia__hoy {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--borde);
+  border-radius: var(--r-sm);
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel-dia__flecha:hover,
+.panel-dia__hoy:hover { border-color: var(--verde-borde); }
+
+/* ---------- Filtro por profesional ---------- */
+
+.panel-filtro { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.panel-filtro:empty { display: none; }
+
+.panel-filtro__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1.5px solid var(--borde);
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-weight: 600;
+  font-size: .9rem;
+  cursor: pointer;
+}
+
+.panel-filtro__chip--sel { background: var(--verde); border-color: var(--verde); color: #fff; }
+
+.panel-filtro__n {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--verde-tenue);
+  color: var(--verde);
+  font-size: .75rem;
+  text-align: center;
+}
+
+.panel-filtro__chip--sel .panel-filtro__n { background: rgba(255, 255, 255, .2); color: #fff; }
+
+/* ---------- Tabla de citas ---------- */
+
 .panel-tabla {
   width: 100%;
   border-collapse: collapse;
@@ -21,9 +112,85 @@
 .panel-tabla td {
   padding: 10px;
   border-bottom: 1px solid var(--borde);
+  vertical-align: middle;
 }
 
 .panel-tabla tbody tr:hover { background: var(--verde-tenue); }
+
+.panel-tabla__hora { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.panel-cliente { display: block; font-weight: 600; }
+
+.panel-tel {
+  font-size: .82rem;
+  color: var(--texto-suave);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-tel:hover { color: var(--verde); text-decoration: underline; }
+
+.panel-acciones { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+.panel-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1.5px solid var(--borde);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.panel-btn:hover { border-color: var(--verde-borde); }
+.panel-btn:disabled { opacity: .5; cursor: progress; }
+.panel-btn--ok { background: var(--verde); border-color: var(--verde); color: #fff; }
+.panel-btn--ok:hover { background: var(--verde-hover); }
+.panel-btn--peligro { color: var(--peligro); }
+.panel-btn--peligro:hover { border-color: var(--peligro); }
+
+/* En el celular la tabla se vuelve tarjetas: una cita por bloque. */
+@media (max-width: 680px) {
+  .panel-tabla thead { display: none; }
+  .panel-tabla, .panel-tabla tbody, .panel-tabla tr, .panel-tabla td { display: block; }
+
+  .panel-tabla tr {
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--borde);
+    border-radius: var(--r);
+    background: var(--superficie);
+    box-shadow: var(--sombra);
+  }
+
+  .panel-tabla td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    border: none;
+    text-align: right;
+  }
+
+  .panel-tabla td::before {
+    content: attr(data-titulo);
+    color: var(--texto-suave);
+    font-size: .82rem;
+    text-align: left;
+  }
+
+  .panel-tabla__acciones:empty { display: none; }
+  .panel-tabla__acciones { padding-top: 10px !important; }
+  .panel-tabla__acciones::before { content: none !important; }
+  .panel-acciones { width: 100%; justify-content: stretch; }
+  .panel-acciones .panel-btn { flex: 1; min-height: 44px; }
+}
+
+/* ---------- Chips de estado ---------- */
 
 .panel-chip {
   display: inline-block;
@@ -33,12 +200,21 @@
   font-weight: 700;
   background: var(--verde-tenue);
   color: var(--verde);
+  white-space: nowrap;
 }
 
 .panel-chip--cancelada { background: rgba(178, 59, 59, .12); color: var(--peligro); }
-.panel-chip--no_asistio { background: rgba(178, 59, 59, .12); color: var(--peligro); }
-.panel-chip--atendida { background: var(--verde-tenue); color: var(--verde); }
+.panel-chip--no_asistio { background: #fbf1d9; color: #7c5310; }
+.panel-chip--atendida { background: var(--verde); color: #fff; }
 .panel-chip--confirmada { background: var(--verde-tenue); color: var(--verde); }
+
+@media (prefers-color-scheme: dark) {
+  .panel-chip--confirmada { color: #cfe6d8; }
+  .panel-chip--no_asistio { background: #3a2e12; color: #f0d9a4; }
+  .panel-chip--cancelada { color: #f0a3a3; }
+}
+
+/* ---------- Métricas ---------- */
 
 .panel-metricas {
   display: grid;
@@ -63,9 +239,45 @@
   color: var(--verde);
 }
 
+@media (prefers-color-scheme: dark) { .panel-metrica__valor { color: #cfe6d8; } }
+
 .panel-metrica__etiqueta {
   display: block;
   margin-top: 4px;
   font-size: .78rem;
   color: var(--texto-suave);
 }
+
+/* ---------- Alerta de avisos fallidos ---------- */
+
+.panel-alerta {
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border-radius: var(--r-sm);
+  background: #fbf1d9;
+  color: #7c5310;
+  font-size: .92rem;
+}
+
+.panel-alerta strong { display: block; margin-bottom: 2px; }
+
+@media (prefers-color-scheme: dark) { .panel-alerta { background: #3a2e12; color: #f0d9a4; } }
+
+/* ---------- Aviso flotante tras una acción ---------- */
+
+.panel-aviso {
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: calc(100% - 32px);
+  padding: 12px 18px;
+  border-radius: var(--r-sm);
+  background: var(--verde-header);
+  color: #fbfaf6;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
+}
+
+.panel-aviso--error { background: var(--peligro); }

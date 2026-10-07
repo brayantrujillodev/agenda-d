@@ -173,7 +173,8 @@
 
   // --- Respuestas ------------------------------------------------
   const ok = (status, body) => ({ status, body });
-  const err = (status, codigo, mensaje) => ({ status, body: { codigo, mensaje } });
+  const err = (status, codigo, mensaje, campo) =>
+    ({ status, body: campo ? { codigo, mensaje, campo } : { codigo, mensaje } });
 
   // --- Enrutador ------------------------------------------------
   function resolver(method, ruta, opciones) {
@@ -215,10 +216,10 @@
 
       const b = opciones.body || {};
       if (!b.clienteNombre || b.clienteNombre.trim().length < 2 || b.clienteNombre.length > 120) {
-        return err(400, 'DATOS_INVALIDOS', 'Escribe tu nombre completo (mínimo 2 letras).');
+        return err(400, 'DATOS_INVALIDOS', 'Escribe tu nombre completo (mínimo 2 letras).', 'clienteNombre');
       }
       if (!/^[0-9]{10}$/.test(b.clienteCelular || '')) {
-        return err(400, 'DATOS_INVALIDOS', 'El número de celular debe tener 10 dígitos.');
+        return err(400, 'DATOS_INVALIDOS', 'El número de celular debe tener 10 dígitos.', 'clienteCelular');
       }
       const servicio = SERVICIOS.find(s => s.id === b.servicioId);
       const prof = PROFESIONALES.find(x => x.id === b.profesionalId);

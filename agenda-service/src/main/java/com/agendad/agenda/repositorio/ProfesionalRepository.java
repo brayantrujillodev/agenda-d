@@ -11,6 +11,9 @@ public interface ProfesionalRepository extends JpaRepository<Profesional, UUID> 
 
     List<Profesional> findByNegocioIdAndActivoTrueAndIdInOrderByNombre(UUID negocioId, Collection<UUID> ids);
 
+    /** Profesionales activos del negocio, para el panel de recepción. */
+    List<Profesional> findByNegocioIdAndActivoTrueOrderByNombre(UUID negocioId);
+
     /** Confirma que el profesional es de ese negocio antes de mostrar su agenda. */
     Optional<Profesional> findByIdAndNegocioId(UUID id, UUID negocioId);
 }

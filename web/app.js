@@ -69,9 +69,10 @@
     servicio: null,   // { id, nombre, duracionMin, precio }
     fecha: null,      // 'YYYY-MM-DD'
     cupo: null,       // { inicio, fin, horaLocal, profesionalId, profesionalNombre }
+    profesionalId: null,   // filtro "con quién": null = cualquiera
     idemKey: null,    // UUID estable para reintentar el MISMO cupo sin duplicar
   };
-  let ultimaCita = null;   // respuesta 201, para la pantalla de confirmación
+  let ultimaCita = null;   // respuesta 201 + token, para no volver a pedirla al confirmar
 
   // ==========================================================================
   //  Utilidades
@@ -123,6 +124,147 @@
   }
 
   const estaOffline = () => !navigator.onLine;
+
+  const ESTADO_ETIQUETA = {
+    CONFIRMADA: 'Confirmada',
+    CANCELADA: 'Cancelada',
+    ATENDIDA: 'Atendida',
+    NO_ASISTIO: 'No asistió',
+    PASADA: 'Pasada',   // solo en "Mis citas": confirmada cuya hora ya pasó
+  };
+
+  function chipEstado(estado) {
+    const span = document.createElement('span');
+    span.className = `chip-estado chip-estado--${String(estado).toLowerCase()}`;
+    span.textContent = ESTADO_ETIQUETA[estado] || estado;
+    return span;
+  }
+
+  function definicionEstado(dl, estado) {
+    const dt = document.createElement('dt');
+    dt.textContent = 'Estado';
+    const dd = document.createElement('dd');
+    dd.appendChild(chipEstado(estado));
+    dl.append(dt, dd);
+  }
+
+  // ==========================================================================
+  //  Mis citas  (guardadas en este dispositivo)
+  // ==========================================================================
+  // El enlace de gestión es la ÚNICA forma de cancelar sin cuenta. Si solo
+  // vive en memoria, un F5 en la pantalla de confirmación lo pierde. Se
+  // guarda en localStorage; si el navegador no lo permite (modo privado),
+  // la app sigue funcionando y solo se pierde esta comodidad.
+
+  const CLAVE_MIS_CITAS = 'agenda-d.mis-citas';
+
+  function leerMisCitas() {
+    try {
+      const lista = JSON.parse(localStorage.getItem(CLAVE_MIS_CITAS) || '[]');
+      return Array.isArray(lista) ? lista : [];
+    } catch (_) { return []; }
+  }
+
+  function escribirMisCitas(lista) {
+    try { localStorage.setItem(CLAVE_MIS_CITAS, JSON.stringify(lista)); } catch (_) { /* sin storage */ }
+  }
+
+  /** Inserta o actualiza la cita del token con los campos que traiga `cita`. */
+  function guardarCita(token, cita) {
+    if (!token) return;
+    const lista = leerMisCitas();
+    const previa = lista.find((c) => c.token === token) || { token };
+    const nueva = {
+      ...previa,
+      servicioNombre: cita.servicioNombre ?? previa.servicioNombre,
+      profesionalNombre: cita.profesionalNombre ?? previa.profesionalNombre,
+      inicio: cita.inicio ?? previa.inicio,
+      fin: cita.fin ?? previa.fin,
+      horaLocal: cita.horaLocal ?? previa.horaLocal,
+      estado: cita.estado ?? previa.estado,
+    };
+    escribirMisCitas([nueva, ...lista.filter((c) => c.token !== token)]);
+  }
+
+  function olvidarCita(token) {
+    escribirMisCitas(leerMisCitas().filter((c) => c.token !== token));
+  }
+
+  function pintarEnlaceMisCitas() {
+    const n = leerMisCitas().filter((c) => c.estado === 'CONFIRMADA' && new Date(c.fin || c.inicio) > new Date()).length;
+    const enlace = document.getElementById('enlace-mis-citas');
+    enlace.hidden = leerMisCitas().length === 0;
+    enlace.querySelector('[data-n]').textContent = n ? String(n) : '';
+  }
+
+  // ==========================================================================
+  //  Después de reservar: calendario y compartir
+  // ==========================================================================
+
+  const enlaceGestionPwa = (token) => `${location.origin}${location.pathname}#/gestion/${token}`;
+
+  function nombreNegocio() {
+    return CFG.negocioNombre || 'el negocio';
+  }
+
+  /** Archivo .ics (RFC 5545) con la cita en UTC: el calendario la muestra en la zona del teléfono. */
+  function descargarIcs(cita, token) {
+    const utc = (iso) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const escaparIcs = (t) => String(t).replace(/([,;\\])/g, '\\$1').replace(/\n/g, '\\n');
+    const lineas = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//AGENDA-D//PWA//ES',
+      'BEGIN:VEVENT',
+      `UID:${cita.id || token}@agenda-d`,
+      `DTSTAMP:${utc(new Date().toISOString())}`,
+      `DTSTART:${utc(cita.inicio)}`,
+      `DTEND:${utc(cita.fin || cita.inicio)}`,
+      `SUMMARY:${escaparIcs(`${cita.servicioNombre} · ${nombreNegocio()}`)}`,
+      `DESCRIPTION:${escaparIcs(`Con ${cita.profesionalNombre}. Ver o cancelar: ${enlaceGestionPwa(token)}`)}`,
+      'BEGIN:VALARM',
+      'TRIGGER:-PT1H',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Tu cita es en una hora',
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ];
+    const blob = new Blob([lineas.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mi-cita.ics';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function textoParaCompartir(cita, token) {
+    return `Mi cita en ${nombreNegocio()}: ${cita.servicioNombre} con ${cita.profesionalNombre}, ` +
+      `${fechaLocalDeCita(cita.inicio, cita.horaLocal)} a las ${cita.horaLocal}. ` +
+      `Ver o cancelar: ${enlaceGestionPwa(token)}`;
+  }
+
+  /** Botones de calendario y WhatsApp debajo del detalle de una cita confirmada. */
+  function montarAccionesCita(contenedor, cita, token) {
+    contenedor.hidden = false;
+    contenedor.querySelector('[data-ics]').addEventListener('click', () => descargarIcs(cita, token));
+    contenedor.querySelector('[data-whatsapp]').href =
+      `https://wa.me/?text=${encodeURIComponent(textoParaCompartir(cita, token))}`;
+  }
+
+  // ==========================================================================
+  //  Diálogo de confirmación propio (en vez de confirm())
+  // ==========================================================================
+
+  function confirmar(dlg) {
+    return new Promise((resolver) => {
+      dlg.addEventListener('close', () => resolver(dlg.returnValue === 'si'), { once: true });
+      dlg.returnValue = 'no';
+      dlg.showModal();
+    });
+  }
 
   // --- iconos SVG (inline, sin assets) ---
   const SVG_RELOJ = '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.3"/><path d="M8 4.4V8l2.6 1.6"/></svg>';
@@ -226,6 +368,30 @@
   //  Vista · disponibilidad   (#/reservar?servicio=…)
   // ==========================================================================
 
+  const DIAS_RAPIDOS = 7;   // botones Hoy, Mañana, … ; más allá, el selector de fecha
+
+  function etiquetaDia(fecha, i) {
+    if (i === 0) return 'Hoy';
+    if (i === 1) return 'Mañana';
+    const d = new Date(fecha + 'T12:00:00');
+    const dia = d.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '');
+    return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${d.getDate()}`;
+  }
+
+  function sumarDias(fecha, n) {
+    const d = new Date(fecha + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /** Mañana (< 12:00), Tarde (12:00–17:59), Noche (desde 18:00), por hora local del negocio. */
+  function franjaDe(horaLocal) {
+    const h = Number(String(horaLocal).split(':')[0]);
+    if (h < 12) return 'Mañana';
+    if (h < 18) return 'Tarde';
+    return 'Noche';
+  }
+
   async function vistaDisponibilidad(servicioId) {
     // Resolver el servicio si venimos de un enlace directo o de un F5.
     if (!flujo.servicio || flujo.servicio.id !== servicioId) {
@@ -245,19 +411,118 @@
     v.querySelector('[data-volver]').addEventListener('click', () => { location.hash = '#/'; });
 
     const input = v.querySelector('[data-fecha]');
+    const dias = v.querySelector('[data-dias]');
+    const filtroProf = v.querySelector('[data-profesionales]');
     const cont = v.querySelector('[data-cupos]');
     const barra = v.querySelector('[data-barra]');
-    input.min = hoyLocal();
-    input.value = flujo.fecha && flujo.fecha >= hoyLocal() ? flujo.fecha : hoyLocal();
-    input.addEventListener('change', () => cargar());
+    const hoy = hoyLocal();
+    input.min = hoy;
+    input.value = flujo.fecha && flujo.fecha >= hoy ? flujo.fecha : hoy;
+    input.addEventListener('change', () => { pintarDias(); cargar(); });
+
+    // --- botones de los próximos días ---
+    const fechasRapidas = Array.from({ length: DIAS_RAPIDOS }, (_, i) => sumarDias(hoy, i));
+    function pintarDias() {
+      dias.replaceChildren(...fechasRapidas.map((f, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip' + (f === input.value ? ' chip--sel' : '');
+        b.setAttribute('aria-pressed', String(f === input.value));
+        b.textContent = etiquetaDia(f, i);
+        b.addEventListener('click', () => { input.value = f; pintarDias(); cargar(); });
+        return b;
+      }));
+      const sel = dias.querySelector('.chip--sel');
+      if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    pintarDias();
 
     let seleccion = null;
+    let cuposDelDia = [];
+    // Profesionales vistos en cualquier día consultado: así el elegido sigue
+    // en la lista aunque hoy no tenga cupos.
+    const profesionales = new Map();
+
     v.querySelector('[data-continuar]').addEventListener('click', () => {
       if (!seleccion) return;
       flujo.cupo = seleccion;
       flujo.idemKey = nuevaClave();   // cupo nuevo => intento nuevo de reserva
       location.hash = '#/datos';
     });
+
+    // --- filtro por profesional (sale de los cupos: no hay ruta pública de profesionales) ---
+    function pintarProfesionales() {
+      if (profesionales.size < 2) { filtroProf.hidden = true; return; }
+      filtroProf.hidden = false;
+      const chips = [['', 'Cualquiera'], ...profesionales];
+      filtroProf.querySelector('[data-chips]').replaceChildren(...chips.map(([id, nombre]) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const activo = (flujo.profesionalId || '') === id;
+        b.className = 'chip' + (activo ? ' chip--sel' : '');
+        b.setAttribute('aria-pressed', String(activo));
+        b.textContent = nombre;
+        b.addEventListener('click', () => {
+          flujo.profesionalId = id || null;
+          pintarProfesionales();
+          pintarCupos();
+        });
+        return b;
+      }));
+    }
+
+    function pintarCupos() {
+      seleccion = null;
+      barra.hidden = true;
+      const cupos = flujo.profesionalId
+        ? cuposDelDia.filter((c) => c.profesionalId === flujo.profesionalId)
+        : cuposDelDia;
+
+      if (cupos.length === 0) {
+        const quien = flujo.profesionalId && profesionales.get(flujo.profesionalId);
+        cont.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'cupos__vacio';
+        p.textContent = quien && cuposDelDia.length
+          ? `${quien} no tiene cupos libres ese día. Prueba con otro profesional o con otra fecha.`
+          : 'No hay cupos libres ese día. Prueba con otra fecha.';
+        cont.appendChild(p);
+        return;
+      }
+
+      const botones = [];
+      const grupos = new Map();
+      cupos.forEach((c) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cupo';
+        b.innerHTML = '<span class="cupo__hora"></span><span class="cupo__prof"></span>';
+        b.querySelector('.cupo__hora').textContent = c.horaLocal;
+        b.querySelector('.cupo__prof').textContent = c.profesionalNombre;
+        b.addEventListener('click', () => {
+          seleccion = c;
+          botones.forEach((x) => x.classList.toggle('cupo--sel', x === b));
+          barra.hidden = false;
+        });
+        botones.push(b);
+        const franja = franjaDe(c.horaLocal);
+        if (!grupos.has(franja)) grupos.set(franja, []);
+        grupos.get(franja).push(b);
+      });
+
+      cont.replaceChildren(...[...grupos].map(([franja, bs]) => {
+        const g = document.createElement('div');
+        g.className = 'franja';
+        const h = document.createElement('h3');
+        h.className = 'franja__titulo';
+        h.textContent = `${franja} · ${bs.length} ${bs.length === 1 ? 'horario' : 'horarios'}`;
+        const grid = document.createElement('div');
+        grid.className = 'cupos';
+        grid.append(...bs);
+        g.append(h, grid);
+        return g;
+      }));
+    }
 
     let peticion = 0;   // descarta respuestas de una fecha que el usuario ya cambió
     cargar();
@@ -273,29 +538,17 @@
         const r = await api.disponibilidad(s.id, flujo.fecha);
         if (mia !== peticion) return;   // llegó tarde: hay una búsqueda más nueva
         if (r.status !== 200) {
-          cont.innerHTML = `<p class="cupos__error">${(r.body && r.body.mensaje) || 'No pudimos cargar los horarios.'}</p>`;
+          cont.innerHTML = '';
+          const p = document.createElement('p');
+          p.className = 'cupos__error';
+          p.textContent = (r.body && r.body.mensaje) || 'No pudimos cargar los horarios.';
+          cont.appendChild(p);
           return;
         }
-        const cupos = r.body.cupos || [];
-        if (cupos.length === 0) {
-          cont.innerHTML = '<p class="cupos__vacio">No hay cupos libres ese día. Prueba con otra fecha.</p>';
-          return;
-        }
-        const botones = cupos.map((c) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'cupo';
-          b.innerHTML = '<span class="cupo__hora"></span><span class="cupo__prof"></span>';
-          b.querySelector('.cupo__hora').textContent = c.horaLocal;
-          b.querySelector('.cupo__prof').textContent = c.profesionalNombre;
-          b.addEventListener('click', () => {
-            seleccion = c;
-            botones.forEach((x) => x.classList.toggle('cupo--sel', x === b));
-            barra.hidden = false;
-          });
-          return b;
-        });
-        cont.replaceChildren(...botones);
+        cuposDelDia = r.body.cupos || [];
+        cuposDelDia.forEach((c) => profesionales.set(c.profesionalId, c.profesionalNombre));
+        pintarProfesionales();
+        pintarCupos();
       } catch (e) {
         if (mia !== peticion) return;
         cont.innerHTML = e instanceof SinRed
@@ -348,7 +601,8 @@
       limpiarErrores();
       const datos = new FormData(form);
       const clienteNombre = (datos.get('clienteNombre') || '').toString().trim();
-      const clienteCelular = (datos.get('clienteCelular') || '').toString().trim();
+      // "300 123 4567" o "300-123-4567" también valen: se quitan los separadores.
+      const clienteCelular = (datos.get('clienteCelular') || '').toString().replace(/[\s.-]/g, '');
 
       let hayError = false;
       if (clienteNombre.length < 2 || clienteNombre.length > 120) {
@@ -356,7 +610,10 @@
         hayError = true;
       }
       if (!/^[0-9]{10}$/.test(clienteCelular)) {
-        erroresDe('clienteCelular').textContent = 'El celular debe tener 10 dígitos, sin espacios.';
+        erroresDe('clienteCelular').textContent = 'El celular debe tener 10 dígitos. Ejemplo: 3001234567.';
+        hayError = true;
+      } else if (!clienteCelular.startsWith('3')) {
+        erroresDe('clienteCelular').textContent = 'Los celulares en Colombia empiezan por 3. Revisa el número.';
         hayError = true;
       }
       if (hayError) return;
@@ -378,8 +635,11 @@
         });
 
         if (r.status === 201) {
-          ultimaCita = r.body;
-          location.hash = '#/confirmada';
+          const token = tokenDeEnlace(r.body.enlaceGestion);
+          ultimaCita = { ...r.body, token };
+          guardarCita(token, r.body);
+          // El token va en la URL: un F5 en la confirmación ya no pierde el enlace.
+          location.hash = `#/confirmada/${token}`;
           return;
         }
         if (r.status === 409) {
@@ -387,10 +647,10 @@
           return;
         }
         if (r.status === 400 && r.body && r.body.mensaje) {
-          const msg = r.body.mensaje;
-          if (/celular/i.test(msg)) erroresDe('clienteCelular').textContent = msg;
-          else if (/nombre/i.test(msg)) erroresDe('clienteNombre').textContent = msg;
-          else mostrarAviso(msg);
+          // agenda-service dice qué campo falló; el mock (y versiones viejas) no.
+          const casilla = r.body.campo ? erroresDe(r.body.campo) : null;
+          if (casilla) casilla.textContent = r.body.mensaje;
+          else mostrarAviso(r.body.mensaje);
           return;
         }
         mostrarAviso((r.body && r.body.mensaje) || 'No pudimos completar la reserva. Intenta de nuevo.');
@@ -441,24 +701,33 @@
   }
 
   // ==========================================================================
-  //  Vista · confirmación   (#/confirmada)
+  //  Vista · confirmación   (#/confirmada/{token})
   // ==========================================================================
 
-  function vistaConfirmada() {
-    if (!ultimaCita) { location.hash = '#/'; return; }
-    const c = ultimaCita;
-    const v = pintar('tpl-confirmada');
+  async function vistaConfirmada(token) {
+    let c = ultimaCita && ultimaCita.token === token ? ultimaCita : null;
+    if (!c) {
+      // F5 o enlace abierto después: se reconstruye desde el token.
+      try {
+        const r = await api.verCita(token);
+        if (r.status !== 200) return vistaGestion(token);
+        c = r.body;
+      } catch (_) {
+        return vistaGestion(token);
+      }
+    }
 
+    const v = pintar('tpl-confirmada');
     const dl = v.querySelector('[data-detalle]');
     definicion(dl, 'Servicio', c.servicioNombre);
     definicion(dl, 'Profesional', c.profesionalNombre);
     definicion(dl, 'Fecha', fechaLocalDeCita(c.inicio, c.horaLocal));
     definicion(dl, 'Hora', c.horaLocal);
-    definicion(dl, 'Estado', c.estado);
+    definicionEstado(dl, c.estado);
 
-    const token = tokenDeEnlace(c.enlaceGestion);
-    const enlacePwa = `${location.origin}${location.pathname}#/gestion/${token}`;
+    montarAccionesCita(v.querySelector('[data-acciones-cita]'), c, token);
 
+    const enlacePwa = enlaceGestionPwa(token);
     const inputEnlace = v.querySelector('[data-enlace]');
     inputEnlace.value = enlacePwa;
 
@@ -475,6 +744,7 @@
     });
 
     v.querySelector('[data-abrir-gestion]').setAttribute('href', `#/gestion/${token}`);
+    pintarEnlaceMisCitas();
   }
 
   // ==========================================================================
@@ -486,7 +756,9 @@
     const dl = v.querySelector('[data-detalle]');
     const acciones = v.querySelector('[data-acciones]');
     const avisoCancelada = v.querySelector('[data-cancelada]');
+    const avisoError = v.querySelector('[data-error-accion]');
     const btnCancelar = v.querySelector('[data-cancelar]');
+    const dialogo = v.querySelector('[data-dialogo-cancelar]');
 
     dl.innerHTML = '<dt>Cargando…</dt><dd></dd>';
 
@@ -504,6 +776,9 @@
         : 'No pudimos consultar tu cita.');
     }
 
+    guardarCita(token, cita);   // también la estrena en "Mis citas" si llegó por un enlace
+    pintarEnlaceMisCitas();
+
     dl.innerHTML = '';
     definicion(dl, 'Servicio', cita.servicioNombre);
     definicion(dl, 'Profesional', cita.profesionalNombre);
@@ -511,21 +786,31 @@
     definicion(dl, 'Hora', cita.horaLocal);
     definicion(dl, 'A nombre de', cita.clienteNombre);
     definicion(dl, 'Celular', cita.clienteCelular);
-    definicion(dl, 'Estado', cita.estado);
+    definicionEstado(dl, cita.estado);
 
     if (cita.estado !== 'CONFIRMADA') {
       acciones.hidden = true;
       avisoCancelada.hidden = false;
       avisoCancelada.textContent = cita.estado === 'CANCELADA'
         ? 'Esta cita está cancelada. El cupo quedó libre para otra persona.'
-        : `Esta cita ya está marcada como ${cita.estado.toLowerCase()}.`;
+        : `Esta cita ya está marcada como ${(ESTADO_ETIQUETA[cita.estado] || cita.estado).toLowerCase()}.`;
       return;
     }
 
+    montarAccionesCita(v.querySelector('[data-acciones-cita]'), cita, token);
+    dialogo.querySelector('[data-detalle-dialogo]').textContent =
+      `${cita.servicioNombre} · ${fechaLocalDeCita(cita.inicio, cita.horaLocal)} · ${cita.horaLocal} con ${cita.profesionalNombre}`;
+
+    const mostrarError = (texto) => {
+      avisoError.hidden = false;
+      avisoError.textContent = texto;
+    };
+
     btnCancelar.addEventListener('click', async () => {
-      if (!confirm('¿Seguro que quieres cancelar tu cita? Esto libera el cupo para otra persona.')) return;
+      avisoError.hidden = true;
+      if (!(await confirmar(dialogo))) return;
       if (estaOffline()) {
-        alert('Necesitas conexión a internet para cancelar la cita.');
+        mostrarError('Necesitas conexión a internet para cancelar la cita.');
         return;
       }
       btnCancelar.disabled = true;
@@ -533,9 +818,9 @@
       try {
         const r = await api.cancelar(token);
         if (r.status === 204) return vistaGestion(token);   // recarga: mostrará el estado cancelado
-        alert((r.body && r.body.mensaje) || 'No pudimos cancelar la cita. Intenta de nuevo.');
+        mostrarError((r.body && r.body.mensaje) || 'No pudimos cancelar la cita. Intenta de nuevo.');
       } catch (e) {
-        alert(e instanceof SinRed
+        mostrarError(e instanceof SinRed
           ? 'Se perdió la conexión. Intenta cancelar de nuevo.'
           : 'No pudimos cancelar la cita. Intenta de nuevo.');
       } finally {
@@ -543,6 +828,55 @@
         btnCancelar.textContent = 'Cancelar esta cita';
       }
     });
+  }
+
+  // ==========================================================================
+  //  Vista · mis citas   (#/mis-citas)
+  // ==========================================================================
+
+  function vistaMisCitas() {
+    const v = pintar('tpl-mis-citas');
+    const lista = v.querySelector('[data-lista]');
+    const ahora = new Date();
+    const citas = leerMisCitas();
+
+    if (citas.length === 0) {
+      lista.innerHTML = '<li class="cupos__vacio">Todavía no has reservado desde este dispositivo.</li>';
+      return;
+    }
+
+    // Próximas primero (la más cercana arriba); después las demás, la más reciente arriba.
+    const fin = (c) => new Date(c.fin || c.inicio);
+    const esProxima = (c) => c.estado === 'CONFIRMADA' && fin(c) > ahora;
+    const proximas = citas.filter(esProxima).sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
+    const resto = citas.filter((c) => !esProxima(c)).sort((a, b) => new Date(b.inicio) - new Date(a.inicio));
+
+    lista.replaceChildren(...[...proximas, ...resto].map((c) => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.className = 'mi-cita' + (esProxima(c) ? '' : ' mi-cita--pasada');
+      a.href = `#/gestion/${c.token}`;
+      a.innerHTML = `
+        <span class="miniatura">${iconoServicio(c.servicioNombre)}</span>
+        <span class="mi-cita__info">
+          <span class="mi-cita__titulo"></span>
+          <span class="linea-meta" data-cuando></span>
+        </span>`;
+      a.querySelector('.mi-cita__titulo').textContent = `${c.servicioNombre} con ${c.profesionalNombre}`;
+      a.querySelector('[data-cuando]').textContent = `${fechaLocalDeCita(c.inicio, c.horaLocal)} · ${c.horaLocal}`;
+      a.appendChild(chipEstado(c.estado === 'CONFIRMADA' && !esProxima(c) ? 'PASADA' : c.estado));
+      li.appendChild(a);
+
+      if (!esProxima(c)) {
+        const quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.className = 'mi-cita__quitar';
+        quitar.textContent = 'Quitar de la lista';
+        quitar.addEventListener('click', () => { olvidarCita(c.token); pintarEnlaceMisCitas(); vistaMisCitas(); });
+        li.appendChild(quitar);
+      }
+      return li;
+    }));
   }
 
   // ==========================================================================
@@ -571,7 +905,11 @@
     if (path === '/' || path === '') return vistaServicios();
     if (path === '/reservar') return vistaDisponibilidad(params.get('servicio'));
     if (path === '/datos') return vistaDatos();
-    if (path === '/confirmada') return vistaConfirmada();
+    if (path === '/mis-citas') return vistaMisCitas();
+    if (path.startsWith('/confirmada/')) {
+      return vistaConfirmada(decodeURIComponent(path.slice('/confirmada/'.length)));
+    }
+    if (path === '/confirmada') return location.replace('#/mis-citas');   // enlace viejo, sin token
     if (path.startsWith('/gestion/')) {
       const token = decodeURIComponent(path.slice('/gestion/'.length));
       return token ? vistaGestion(token) : vistaError('Enlace incompleto', 'Ese enlace no trae el código de tu cita.');
@@ -642,6 +980,7 @@
       document.getElementById('pie-nombre').textContent = CFG.negocioNombre;
     }
     pintarOffline();
+    pintarEnlaceMisCitas();
     if (!location.hash) history.replaceState(null, '', '#/');
     enrutar();
 
@@ -658,8 +997,15 @@
     });
 
     if ('serviceWorker' in navigator) {
+      // Si ya había un SW controlando y llega uno nuevo, hay versión nueva:
+      // se ofrece recargar en vez de hacerlo solo (podría haber un formulario a medias).
+      const habiaControlador = Boolean(navigator.serviceWorker.controller);
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (habiaControlador) document.getElementById('banner-version').hidden = false;
+      });
       navigator.serviceWorker.register('sw.js').catch(() => { /* sin SW la app igual funciona */ });
     }
+    document.querySelector('[data-recargar]').addEventListener('click', () => location.reload());
   }
 
   if (document.readyState === 'loading') {

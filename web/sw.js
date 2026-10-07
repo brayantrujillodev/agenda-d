@@ -5,8 +5,18 @@
  * instalable. Las llamadas a la API (/v1/...) NUNCA se cachean: reservar exige
  * conexión y no hay cola de reservas offline (dos personas reservando el mismo
  * cupo sin red generan un conflicto irresoluble al sincronizar).
+ *
+ * Estrategias:
+ *   - Navegaciones (HTML): red primero, cache si no hay red. Con conexión
+ *     siempre se ve la página publicada más reciente.
+ *   - Resto del app shell (JS, CSS, íconos): cache primero para abrir rápido,
+ *     y en paralelo se pide a la red y se actualiza la cache
+ *     (stale-while-revalidate). Un cambio en app.js llega a más tardar en la
+ *     siguiente visita, sin depender de que alguien suba el número de CACHE.
+ *   - Cuando cambia ESTE archivo, el SW nuevo toma el control y la página
+ *     muestra "Hay una versión nueva" (ver app.js, banner-version).
  */
-const CACHE = 'agenda-d-pwa-v3';
+const CACHE = 'agenda-d-pwa-v4';
 
 const APP_SHELL = [
   './',
@@ -40,6 +50,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function guardar(req, res) {
+  if (res.ok && res.type === 'basic') {
+    const copia = res.clone();
+    caches.open(CACHE).then((c) => c.put(req, copia));
+  }
+  return res;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -51,22 +69,25 @@ self.addEventListener('fetch', (event) => {
   // API o recurso de otro origen: red directa, sin cache.
   if (esApi || !mismoOrigen) return;
 
-  // App shell: cache primero, luego red; si falla una navegación, sirve index.
+  // Navegación: red primero; sin red, la copia guardada (o index si no hay).
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => guardar(req, res))
+        .catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // App shell: cache primero y revalidación en segundo plano.
   event.respondWith(
     caches.match(req).then((cacheado) => {
-      if (cacheado) return cacheado;
-      return fetch(req)
-        .then((res) => {
-          if (res.ok && res.type === 'basic') {
-            const copia = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copia));
-          }
-          return res;
-        })
-        .catch(() => {
-          if (req.mode === 'navigate') return caches.match('./index.html');
-          return Response.error();
-        });
+      const deRed = fetch(req).then((res) => guardar(req, res));
+      if (cacheado) {
+        event.waitUntil(deRed.catch(() => { /* sin red: se queda la copia */ }));
+        return cacheado;
+      }
+      return deRed.catch(() => Response.error());
     })
   );
 });

@@ -262,7 +262,7 @@ Cumplida vía [PR #14](../../pull/14).
 
 ---
 
-### 🔶 #13 · PWA · pantalla pública de reserva — falta conectar al backend real
+### ✅ #13 · PWA · pantalla pública de reserva — cerrado
 
 **Asignado:** Johan (líder original) · construida en la práctica por Andrés vía PR #12
 **Toca:** `web/index.html`, `web/app.js`, `web/style.css`, `web/manifest.json`, `web/sw.js`
@@ -272,11 +272,10 @@ Cumplida vía [PR #14](../../pull/14).
 - [x] Muestra el enlace de gestión al confirmar
 - [x] Maneja el `409`: muestra alternativas, no un error feo
 - [x] `manifest.json` + service worker que cachea la interfaz
-- [ ] Sin conexión: mensaje claro de que reservar requiere internet — **verificar**
-- [ ] **Conectar contra `agenda-service` real** (hoy corre contra `web/mock.js`).
-      Ya existen dos ramas remotas listas para esto: `fix/agenda-service-cors`
-      (habilita CORS) y `feature/4-pwa-conectar-backend` (apunta la PWA al
-      backend real). Falta abrir/mergear los PR.
+- [x] Sin conexión: mensaje claro de que reservar requiere internet —
+      verificado en Chrome (banner + aviso al confirmar; la app abre sin red)
+- [x] Conectada contra `agenda-service` real (`useMock: false`), vía
+      `fix/agenda-service-cors` y `feature/4-pwa-conectar-backend`, ya mergeadas
 
 **Aceptación:** instalable en Android desde Chrome y se reserva de punta a
 punta contra el backend real.
@@ -484,6 +483,40 @@ contra Postgres real, no como algo que "se supone que funciona".
 - [x] `docs/GUION-SUSTENTACION.md` actualizado con Fase 3 completa
 - [ ] Ensayar la sustentación dos veces — **pendiente del equipo, no es
       trabajo de código**
+
+### ✅ Mejoras de front: panel de recepción y PWA — 2026-10-07
+
+**Hecho por:** Andrés · **Toca:** `web/`, `agenda-service` (rutas
+administrativas), `gateway-graphql` (mutaciones)
+
+Panel de recepción (`web/panel.html`):
+
+- [x] Registrar resultado (Atendió / No asistió) y cancelar desde el panel.
+      Para eso: `gateway-graphql` implementa `registrarAsistencia` y
+      `cancelarCita` (estaban en el esquema sin resolver) y `agenda-service`
+      suma `GET /v1/profesionales`, `GET /v1/citas/{id}` y
+      `POST /v1/citas/{id}/cancelacion` (`canceladaPor: NEGOCIO`)
+- [x] El gateway consulta la agenda de **todos** los profesionales (antes solo
+      la de Laura, id quemado)
+- [x] Columnas de profesional y celular, filtro por profesional, navegación
+      de días (← / → / Hoy), refresco automático cada minuto, vista móvil en
+      tarjetas, alerta de `citas.dlq` en lenguaje de recepción
+
+PWA de reserva (`web/index.html`):
+
+- [x] "Mis citas" guardadas en el dispositivo; la confirmación sobrevive a un F5
+- [x] Agregar al calendario (`.ics`) y compartir por WhatsApp
+- [x] Elegir barbero, días rápidos (Hoy, Mañana…), cupos por franja
+- [x] Diálogo propio para cancelar, estado legible, errores por campo
+      (`campo` nuevo en los 400 de `agenda-service`), celular que empieza por 3
+- [x] Service worker con stale-while-revalidate y aviso de versión nueva
+
+**Hallazgo pendiente (notificaciones-service, no se tocó aquí):** el bug de
+`Programacion.canal` descrito arriba **sigue ocurriendo** con el stack actual.
+`V3` sí quitó el `NOT NULL` de la columna, pero la entidad
+`Programacion.canal` mantiene `@Column(nullable = false)` y Hibernate rechaza
+el `INSERT` antes de llegar a Postgres: toda reserva nueva termina en
+`citas.dlq`. Se corrige quitando `nullable = false` de la entidad.
 
 ---
 
