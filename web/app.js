@@ -997,8 +997,15 @@
     });
 
     if ('serviceWorker' in navigator) {
+      // Si ya había un SW controlando y llega uno nuevo, hay versión nueva:
+      // se ofrece recargar en vez de hacerlo solo (podría haber un formulario a medias).
+      const habiaControlador = Boolean(navigator.serviceWorker.controller);
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (habiaControlador) document.getElementById('banner-version').hidden = false;
+      });
       navigator.serviceWorker.register('sw.js').catch(() => { /* sin SW la app igual funciona */ });
     }
+    document.querySelector('[data-recargar]').addEventListener('click', () => location.reload());
   }
 
   if (document.readyState === 'loading') {
