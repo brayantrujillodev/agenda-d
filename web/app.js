@@ -69,6 +69,7 @@
     servicio: null,   // { id, nombre, duracionMin, precio }
     fecha: null,      // 'YYYY-MM-DD'
     cupo: null,       // { inicio, fin, horaLocal, profesionalId, profesionalNombre }
+    profesionalId: null,   // filtro "con quién": null = cualquiera
     idemKey: null,    // UUID estable para reintentar el MISMO cupo sin duplicar
   };
   let ultimaCita = null;   // respuesta 201 + token, para no volver a pedirla al confirmar
@@ -367,6 +368,30 @@
   //  Vista · disponibilidad   (#/reservar?servicio=…)
   // ==========================================================================
 
+  const DIAS_RAPIDOS = 7;   // botones Hoy, Mañana, … ; más allá, el selector de fecha
+
+  function etiquetaDia(fecha, i) {
+    if (i === 0) return 'Hoy';
+    if (i === 1) return 'Mañana';
+    const d = new Date(fecha + 'T12:00:00');
+    const dia = d.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '');
+    return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${d.getDate()}`;
+  }
+
+  function sumarDias(fecha, n) {
+    const d = new Date(fecha + 'T12:00:00');
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /** Mañana (< 12:00), Tarde (12:00–17:59), Noche (desde 18:00), por hora local del negocio. */
+  function franjaDe(horaLocal) {
+    const h = Number(String(horaLocal).split(':')[0]);
+    if (h < 12) return 'Mañana';
+    if (h < 18) return 'Tarde';
+    return 'Noche';
+  }
+
   async function vistaDisponibilidad(servicioId) {
     // Resolver el servicio si venimos de un enlace directo o de un F5.
     if (!flujo.servicio || flujo.servicio.id !== servicioId) {
@@ -386,19 +411,118 @@
     v.querySelector('[data-volver]').addEventListener('click', () => { location.hash = '#/'; });
 
     const input = v.querySelector('[data-fecha]');
+    const dias = v.querySelector('[data-dias]');
+    const filtroProf = v.querySelector('[data-profesionales]');
     const cont = v.querySelector('[data-cupos]');
     const barra = v.querySelector('[data-barra]');
-    input.min = hoyLocal();
-    input.value = flujo.fecha && flujo.fecha >= hoyLocal() ? flujo.fecha : hoyLocal();
-    input.addEventListener('change', () => cargar());
+    const hoy = hoyLocal();
+    input.min = hoy;
+    input.value = flujo.fecha && flujo.fecha >= hoy ? flujo.fecha : hoy;
+    input.addEventListener('change', () => { pintarDias(); cargar(); });
+
+    // --- botones de los próximos días ---
+    const fechasRapidas = Array.from({ length: DIAS_RAPIDOS }, (_, i) => sumarDias(hoy, i));
+    function pintarDias() {
+      dias.replaceChildren(...fechasRapidas.map((f, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip' + (f === input.value ? ' chip--sel' : '');
+        b.setAttribute('aria-pressed', String(f === input.value));
+        b.textContent = etiquetaDia(f, i);
+        b.addEventListener('click', () => { input.value = f; pintarDias(); cargar(); });
+        return b;
+      }));
+      const sel = dias.querySelector('.chip--sel');
+      if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    pintarDias();
 
     let seleccion = null;
+    let cuposDelDia = [];
+    // Profesionales vistos en cualquier día consultado: así el elegido sigue
+    // en la lista aunque hoy no tenga cupos.
+    const profesionales = new Map();
+
     v.querySelector('[data-continuar]').addEventListener('click', () => {
       if (!seleccion) return;
       flujo.cupo = seleccion;
       flujo.idemKey = nuevaClave();   // cupo nuevo => intento nuevo de reserva
       location.hash = '#/datos';
     });
+
+    // --- filtro por profesional (sale de los cupos: no hay ruta pública de profesionales) ---
+    function pintarProfesionales() {
+      if (profesionales.size < 2) { filtroProf.hidden = true; return; }
+      filtroProf.hidden = false;
+      const chips = [['', 'Cualquiera'], ...profesionales];
+      filtroProf.querySelector('[data-chips]').replaceChildren(...chips.map(([id, nombre]) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const activo = (flujo.profesionalId || '') === id;
+        b.className = 'chip' + (activo ? ' chip--sel' : '');
+        b.setAttribute('aria-pressed', String(activo));
+        b.textContent = nombre;
+        b.addEventListener('click', () => {
+          flujo.profesionalId = id || null;
+          pintarProfesionales();
+          pintarCupos();
+        });
+        return b;
+      }));
+    }
+
+    function pintarCupos() {
+      seleccion = null;
+      barra.hidden = true;
+      const cupos = flujo.profesionalId
+        ? cuposDelDia.filter((c) => c.profesionalId === flujo.profesionalId)
+        : cuposDelDia;
+
+      if (cupos.length === 0) {
+        const quien = flujo.profesionalId && profesionales.get(flujo.profesionalId);
+        cont.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = 'cupos__vacio';
+        p.textContent = quien && cuposDelDia.length
+          ? `${quien} no tiene cupos libres ese día. Prueba con otro profesional o con otra fecha.`
+          : 'No hay cupos libres ese día. Prueba con otra fecha.';
+        cont.appendChild(p);
+        return;
+      }
+
+      const botones = [];
+      const grupos = new Map();
+      cupos.forEach((c) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cupo';
+        b.innerHTML = '<span class="cupo__hora"></span><span class="cupo__prof"></span>';
+        b.querySelector('.cupo__hora').textContent = c.horaLocal;
+        b.querySelector('.cupo__prof').textContent = c.profesionalNombre;
+        b.addEventListener('click', () => {
+          seleccion = c;
+          botones.forEach((x) => x.classList.toggle('cupo--sel', x === b));
+          barra.hidden = false;
+        });
+        botones.push(b);
+        const franja = franjaDe(c.horaLocal);
+        if (!grupos.has(franja)) grupos.set(franja, []);
+        grupos.get(franja).push(b);
+      });
+
+      cont.replaceChildren(...[...grupos].map(([franja, bs]) => {
+        const g = document.createElement('div');
+        g.className = 'franja';
+        const h = document.createElement('h3');
+        h.className = 'franja__titulo';
+        h.textContent = `${franja} · ${bs.length} ${bs.length === 1 ? 'horario' : 'horarios'}`;
+        const grid = document.createElement('div');
+        grid.className = 'cupos';
+        grid.append(...bs);
+        g.append(h, grid);
+        return g;
+      }));
+    }
 
     let peticion = 0;   // descarta respuestas de una fecha que el usuario ya cambió
     cargar();
@@ -414,29 +538,17 @@
         const r = await api.disponibilidad(s.id, flujo.fecha);
         if (mia !== peticion) return;   // llegó tarde: hay una búsqueda más nueva
         if (r.status !== 200) {
-          cont.innerHTML = `<p class="cupos__error">${(r.body && r.body.mensaje) || 'No pudimos cargar los horarios.'}</p>`;
+          cont.innerHTML = '';
+          const p = document.createElement('p');
+          p.className = 'cupos__error';
+          p.textContent = (r.body && r.body.mensaje) || 'No pudimos cargar los horarios.';
+          cont.appendChild(p);
           return;
         }
-        const cupos = r.body.cupos || [];
-        if (cupos.length === 0) {
-          cont.innerHTML = '<p class="cupos__vacio">No hay cupos libres ese día. Prueba con otra fecha.</p>';
-          return;
-        }
-        const botones = cupos.map((c) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'cupo';
-          b.innerHTML = '<span class="cupo__hora"></span><span class="cupo__prof"></span>';
-          b.querySelector('.cupo__hora').textContent = c.horaLocal;
-          b.querySelector('.cupo__prof').textContent = c.profesionalNombre;
-          b.addEventListener('click', () => {
-            seleccion = c;
-            botones.forEach((x) => x.classList.toggle('cupo--sel', x === b));
-            barra.hidden = false;
-          });
-          return b;
-        });
-        cont.replaceChildren(...botones);
+        cuposDelDia = r.body.cupos || [];
+        cuposDelDia.forEach((c) => profesionales.set(c.profesionalId, c.profesionalNombre));
+        pintarProfesionales();
+        pintarCupos();
       } catch (e) {
         if (mia !== peticion) return;
         cont.innerHTML = e instanceof SinRed

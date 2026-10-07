@@ -101,19 +101,29 @@
         </div>
       </article>
 
-      <label class="campo">
-        <span class="campo__etiqueta">
-          <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 2v3M10.5 2v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Día
-        </span>
+      <h2 class="seccion">
+        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 2v3M10.5 2v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Día
+      </h2>
+      <div class="chips chips--desliza" data-dias role="group" aria-label="Próximos días"></div>
+      <label class="otra-fecha">
+        <span>Otra fecha</span>
         <input type="date" data-fecha class="campo__control">
       </label>
+
+      <div data-profesionales hidden>
+        <h2 class="seccion">
+          <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.8 14c.6-2.8 2.7-4.3 5.2-4.3s4.6 1.5 5.2 4.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          ¿Con quién?
+        </h2>
+        <div class="chips" data-chips role="group" aria-label="Profesional"></div>
+      </div>
 
       <h2 class="seccion">
         <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.4V8l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         Horarios disponibles
       </h2>
-      <div class="cupos" data-cupos aria-live="polite"></div>
+      <div data-cupos aria-live="polite"></div>
 
       <div class="barra-accion" data-barra hidden>
         <button type="button" class="boton boton--primario" data-continuar>Continuar &nbsp;→</button>

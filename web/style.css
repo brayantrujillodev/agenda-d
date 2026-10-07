@@ -435,6 +435,60 @@ input[type="date"].campo__control { display: block; min-height: 48px; }
 .cupo--sel { background: var(--verde); border-color: var(--verde); color: #fff; }
 .cupo--sel .cupo__prof { color: rgba(255, 255, 255, .82); }
 
+/* ---------- Chips (días y profesional) ---------- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Los días van en una sola fila deslizable: en el celular caben ~4 a la vista. */
+.chips--desliza {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 2px 16px 6px;
+  scrollbar-width: none;
+}
+
+.chips--desliza::-webkit-scrollbar { display: none; }
+
+.chip {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1.5px solid var(--borde);
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-weight: 600;
+  font-size: .92rem;
+  cursor: pointer;
+}
+
+.chip:hover { border-color: var(--verde-borde); }
+.chip--sel { background: var(--verde); border-color: var(--verde); color: #fff; }
+
+.otra-fecha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--texto-suave);
+  font-size: .88rem;
+}
+
+.otra-fecha .campo__control { width: auto; flex: 1; max-width: 200px; padding: 9px 12px; }
+
+/* ---------- Franjas de horario ---------- */
+
+.franja + .franja { margin-top: 16px; }
+
+.franja__titulo {
+  margin: 0 0 8px;
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--texto);
+}
+
 .cupos__vacio, .cupos__error {
   grid-column: 1 / -1;
   padding: 26px 0;
