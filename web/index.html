@@ -40,6 +40,9 @@
       </span>
       <span id="negocio-nombre">Reserva tu cita</span>
     </a>
+    <a class="cabecera__mis-citas" id="enlace-mis-citas" href="#/mis-citas" hidden>
+      Mis citas <span class="cabecera__n" data-n></span>
+    </a>
   </header>
 
   <main id="app" class="contenedor">
@@ -139,8 +142,8 @@
         <label class="campo">
           <span class="campo__etiqueta">Celular (10 dígitos)</span>
           <input type="tel" name="clienteCelular" class="campo__control"
-                 autocomplete="tel" inputmode="numeric" pattern="[0-9]{10}"
-                 maxlength="10" required placeholder="3001234567">
+                 autocomplete="tel" inputmode="numeric"
+                 maxlength="13" required placeholder="3001234567">
           <span class="campo__error" data-error="clienteCelular"></span>
         </label>
 
@@ -159,8 +162,20 @@
       <h1 class="vista__titulo">¡Cita confirmada!</h1>
       <dl class="detalle-cita" data-detalle></dl>
 
+      <div class="acciones-cita" data-acciones-cita hidden>
+        <button type="button" class="boton boton--secundario" data-ics>
+          <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 2v3M10.5 2v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Agregar al calendario
+        </button>
+        <a class="boton boton--secundario" data-whatsapp target="_blank" rel="noopener" href="#">
+          <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 0 0-5.4 9.3L1.8 14.2l3.2-.8A6.2 6.2 0 1 0 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+          Enviar por WhatsApp
+        </a>
+      </div>
+
       <div class="gestion-enlace">
-        <p class="vista__ayuda">Guarda este enlace para consultar o cancelar tu cita:</p>
+        <p class="vista__ayuda">Quedó guardada en <a class="enlace-simple enlace-simple--en-linea" href="#/mis-citas">Mis citas</a>
+          de este dispositivo. Si vas a usar otro, guarda este enlace para consultar o cancelar:</p>
         <div class="gestion-enlace__fila">
           <input type="text" data-enlace readonly class="campo__control">
           <button type="button" class="boton boton--secundario" data-copiar>Copiar</button>
@@ -178,13 +193,45 @@
       <dl class="detalle-cita" data-detalle></dl>
 
       <div data-acciones>
+        <div class="acciones-cita" data-acciones-cita hidden>
+          <button type="button" class="boton boton--secundario" data-ics>
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h12M5.5 2v3M10.5 2v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Agregar al calendario
+          </button>
+          <a class="boton boton--secundario" data-whatsapp target="_blank" rel="noopener" href="#">
+            <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8a6.2 6.2 0 0 0-5.4 9.3L1.8 14.2l3.2-.8A6.2 6.2 0 1 0 8 1.8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            Enviar por WhatsApp
+          </a>
+        </div>
+        <p class="aviso-conflicto" data-error-accion hidden></p>
         <button type="button" class="boton boton--peligro" data-cancelar>Cancelar esta cita</button>
       </div>
+
+      <dialog class="dialogo" data-dialogo-cancelar aria-labelledby="dlg-cancelar-titulo">
+        <form method="dialog">
+          <h2 id="dlg-cancelar-titulo" class="dialogo__titulo">¿Cancelar tu cita?</h2>
+          <p class="dialogo__texto" data-detalle-dialogo></p>
+          <p class="dialogo__texto">El cupo queda libre para otra persona. Esto no se puede deshacer.</p>
+          <div class="dialogo__acciones">
+            <button type="submit" value="no" class="boton boton--secundario">Conservarla</button>
+            <button type="submit" value="si" class="boton boton--peligro">Sí, cancelar</button>
+          </div>
+        </form>
+      </dialog>
 
       <p class="aviso-cancelada" data-cancelada hidden>
         Esta cita está cancelada. El cupo quedó libre para otra persona.
       </p>
       <a class="boton boton--secundario" href="#/">Ir al inicio</a>
+    </section>
+  </template>
+
+  <template id="tpl-mis-citas">
+    <section class="vista">
+      <h1 class="vista__titulo">Mis citas</h1>
+      <p class="vista__ayuda">Las que reservaste desde este dispositivo. Toca una para verla o cancelarla.</p>
+      <ul class="lista-mis-citas" data-lista></ul>
+      <a class="boton boton--primario" href="#/">Reservar una cita</a>
     </section>
   </template>
 
