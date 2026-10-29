@@ -3,6 +3,49 @@
 Tres tópicos, más una cola de fallidos. Este archivo se acuerda **antes** de
 escribir el productor o los consumidores. Cambiarlo requiere PR y aviso al grupo.
 
+## Por qué Kafka en esta arquitectura
+
+Reservar es lo único que no puede fallar ni esperar. Todo lo que pasa
+*después* de reservar —avisar al cliente, programar el recordatorio de
+24 h, contar la ocupación y la inasistencia— es trabajo de otros dos
+servicios que pueden estar caídos, lentos o reiniciándose.
+
+| Sin Kafka (llamadas REST en cadena) | Con Kafka |
+|---|---|
+| Si `notificaciones-service` está caído, la reserva falla o hay que inventar reintentos en `agenda-service`. | La reserva responde `201` igual; el evento espera en el tópico y se consume cuando el servicio vuelva. |
+| `agenda-service` tiene que conocer a cada interesado y llamarlo uno por uno. | `agenda-service` publica un hecho; cada consumidor tiene su propio grupo y su propio ritmo. |
+| Agregar analítica obliga a tocar el código de reserva. | `analitica-service` se suscribió a los mismos tópicos sin cambiar el productor. |
+
+Lo que **no** viaja por Kafka: la consulta de cupos y la reserva en sí
+(síncronas, el cliente necesita la respuesta ya) y el panel (consulta,
+va por GraphQL).
+
+## Flujo implementado
+
+```text
+POST /citas ──► agenda.cita + agenda.outbox  (misma transacción)
+                         │
+                OutboxRelay (@Scheduled, 2 s) ── clave = profesionalId
+                         ▼
+        citas.reservadas / citas.canceladas / citas.estado   (3 particiones, 7 días)
+              │                                   │
+   notificaciones-service                 analitica-service
+   grupo notificaciones-service           grupo analitica-service
+   · confirmación / cancelación           · upsert en metrica_diaria
+   · recordatorio 24 h (PENDIENTE)        · GET /v1/metricas → GraphQL
+              │  falla 3 veces (1 s, 4 s, 16 s) o no es JSON
+              ▼
+          citas.dlq ──► notificaciones-service-dlq ──► mensaje_fallido ──► GET /v1/mensajes-fallidos
+```
+
+## Declaración de los tópicos
+
+No dependen del auto-create del broker: el contenedor `kafka-init` del
+`docker-compose.yml` los crea al arrancar con 3 particiones y
+`retention.ms=604800000` (7 días), y termina. Es idempotente
+(`--if-not-exists` + `alter`), así que relanzarlo no rompe nada. Los
+servicios Java esperan a que termine (`service_completed_successfully`).
+
 ## Reglas que aplican a todos los eventos
 
 | Regla | Por qué |
@@ -128,6 +171,32 @@ El panel muestra una alerta. Esto es lo que sostiene el RNF-04.
 El mensaje original se conserva íntegro y se añaden cabeceras con el motivo,
 el tópico de origen y el número de intentos.
 
+Dos tipos de fallo, dos caminos:
+
+| Fallo | Ejemplo | Qué pasa |
+|---|---|---|
+| El listener lanza una excepción | evento sin `inicio`, base de datos caída | 3 reintentos (1 s, 4 s, 16 s) y luego `citas.dlq`, `intentos = 3` |
+| El mensaje ni siquiera es JSON | `esto-no-es-json` | `ErrorHandlingDeserializer` lo marca como no reintentable: va directo a `citas.dlq` con los bytes originales, `intentos = 1` |
+
+Sin el `ErrorHandlingDeserializer`, el segundo caso dejaba al consumidor en
+un bucle de error infinito sobre el mismo offset, con la partición
+bloqueada y sin pasar nunca por la DLQ (encontrado en la Entrega 2 del
+segundo periodo).
+
+## Garantías de entrega y orden
+
+- **Productor:** `acks=all` + `enable.idempotence=true`; el relay espera el
+  ack de cada evento antes de marcarlo `enviado_en`.
+- **Orden:** si un envío falla, el relay corta el lote y reintenta todo en
+  el siguiente ciclo. Seguir con los siguientes publicaría eventos
+  posteriores antes que el fallido y rompería el orden por `profesionalId`.
+- **Consumidores:** al menos una vez. Cada uno deduplica por `eventoId`
+  contra su tabla `evento_procesado` en la misma transacción que el efecto,
+  y deja en el log `Evento … ya procesado, se ignora (reentrega de Kafka)`.
+- **Trazabilidad:** cada consumidor registra `evento`, `cita` y
+  `correlationId` al procesar; el `correlationId` llega desde la cabecera
+  `X-Correlation-Id` de la petición REST original.
+
 ---
 
 ## Cómo probar sin escribir código
@@ -150,3 +219,15 @@ docker exec -i agd-kafka kafka-console-producer.sh \
 
 Ese último comando es útil en la Fase 1: permite que quien construya
 `notificaciones-service` avance sin esperar a que `agenda-service` esté listo.
+
+Para el productor, la clave de partición se publica separada por tabulador:
+
+```bash
+printf '%s\t%s\n' "<profesionalId>" '<json del evento>' | docker exec -i agd-kafka \
+  kafka-console-producer.sh --bootstrap-server localhost:9092 --topic citas.reservadas \
+  --property parse.key=true --property key.separator=$'\t'
+```
+
+Publicar dos veces el mismo `eventoId` es la forma más rápida de ver la
+idempotencia: el segundo mensaje deja en el log de ambos consumidores
+`Evento … ya procesado, se ignora` y no cambia ni un número en la base.

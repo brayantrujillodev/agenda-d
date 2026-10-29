@@ -50,19 +50,22 @@ public class DisponibilidadService {
     private final HorarioAtencionRepository horarioRepo;
     private final BloqueoRepository bloqueoRepo;
     private final CitaRepository citaRepo;
+    private final ValidadorCupo validadorCupo;
 
     public DisponibilidadService(NegocioRepository negocioRepo,
                                  ServicioRepository servicioRepo,
                                  ProfesionalRepository profesionalRepo,
                                  HorarioAtencionRepository horarioRepo,
                                  BloqueoRepository bloqueoRepo,
-                                 CitaRepository citaRepo) {
+                                 CitaRepository citaRepo,
+                                 ValidadorCupo validadorCupo) {
         this.negocioRepo = negocioRepo;
         this.servicioRepo = servicioRepo;
         this.profesionalRepo = profesionalRepo;
         this.horarioRepo = horarioRepo;
         this.bloqueoRepo = bloqueoRepo;
         this.citaRepo = citaRepo;
+        this.validadorCupo = validadorCupo;
     }
 
     @Transactional(readOnly = true)
@@ -84,6 +87,7 @@ public class DisponibilidadService {
         }
 
         ZoneId zona = ZoneId.of(negocio.getZonaHoraria());
+        validadorCupo.validarFecha(fecha, zona);
 
         // Profesionales que prestan el servicio, opcionalmente filtrados por el pedido.
         List<UUID> idsQuePrestan = servicioRepo.findProfesionalIdsByServicioId(servicio.getId());

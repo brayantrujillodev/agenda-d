@@ -214,11 +214,14 @@
       }
 
       const b = opciones.body || {};
-      if (!b.clienteNombre || b.clienteNombre.trim().length < 2 || b.clienteNombre.length > 120) {
-        return err(400, 'DATOS_INVALIDOS', 'Escribe tu nombre completo (mínimo 2 letras).');
+      // Mismas reglas que ReservaRequest en agenda-service.
+      const P = "[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*";
+      const nombre = (b.clienteNombre || '').trim().replace(/s+/g, ' ');
+      if (nombre.length < 5 || nombre.length > 80 || !new RegExp('^' + P + '(?: ' + P + '){1,5}$').test(nombre)) {
+        return err(400, 'DATOS_INVALIDOS', 'Escribe tu nombre y apellido solo con letras, sin números ni símbolos.');
       }
-      if (!/^[0-9]{10}$/.test(b.clienteCelular || '')) {
-        return err(400, 'DATOS_INVALIDOS', 'El número de celular debe tener 10 dígitos.');
+      if (!/^3[0-9]{9}$/.test(b.clienteCelular || '')) {
+        return err(400, 'DATOS_INVALIDOS', 'El celular debe tener 10 dígitos y empezar por 3, sin espacios ni +57.');
       }
       const servicio = SERVICIOS.find(s => s.id === b.servicioId);
       const prof = PROFESIONALES.find(x => x.id === b.profesionalId);

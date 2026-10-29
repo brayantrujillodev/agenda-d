@@ -1,0 +1,1740 @@
+{
+  "info": {
+    "name": "AGENDA-D",
+    "description": "Endpoints de los 4 servicios de AGENDA-D. Contratos en docs/openapi/ y docs/graphql/.\n\nAntes de correrla: `docker compose --profile full up -d` (ver README).\n\nOrden: la carpeta 1 calcula la fecha, toma un cupo libre y reserva. Las demás reutilizan esa cita (variables citaId y tokenGestion).\nSe puede correr completa con el Collection Runner: cada petición trae sus pruebas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "agendaUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "notificacionesUrl",
+      "value": "http://localhost:8082"
+    },
+    {
+      "key": "analiticaUrl",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "gatewayUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "slug",
+      "value": "barberia-el-corte"
+    },
+    {
+      "key": "negocioId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "servicioId",
+      "value": "22222222-2222-2222-2222-222222222222"
+    },
+    {
+      "key": "profesionalId",
+      "value": "33333333-3333-3333-3333-333333333333"
+    },
+    {
+      "key": "fecha",
+      "value": ""
+    },
+    {
+      "key": "inicio",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": ""
+    },
+    {
+      "key": "citaId",
+      "value": ""
+    },
+    {
+      "key": "tokenGestion",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Público · reserva (agenda-service)",
+      "item": [
+        {
+          "name": "Servicios del negocio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 con servicios\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/servicios",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "servicios"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Disponibilidad (toma el primer cupo libre)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Próximo día hábil (lun-sáb) en hora de Bogotá (UTC-5, sin horario de verano).",
+                  "const d = new Date(Date.now() - 5 * 3600 * 1000);",
+                  "do { d.setUTCDate(d.getUTCDate() + 1); } while (d.getUTCDay() === 0);",
+                  "pm.collectionVariables.set(\"fecha\", d.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                  "const cupos = pm.response.json().cupos || [];",
+                  "pm.test(\"hay al menos un cupo libre\", () => pm.expect(cupos).to.not.be.empty);",
+                  "if (cupos.length) pm.collectionVariables.set(\"inicio\", cupos[0].inicio);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/disponibilidad?servicioId={{servicioId}}&fecha={{fecha}}&profesionalId={{profesionalId}}",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "servicioId",
+                  "value": "{{servicioId}}"
+                },
+                {
+                  "key": "fecha",
+                  "value": "{{fecha}}"
+                },
+                {
+                  "key": "profesionalId",
+                  "value": "{{profesionalId}}"
+                }
+              ]
+            },
+            "description": "La fecha se calcula sola: el próximo día de lunes a sábado (hora de Bogotá). Guarda el primer cupo libre en {{inicio}}."
+          }
+        },
+        {
+          "name": "Reservar cita (201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"idempotencyKey\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 cita confirmada\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.json().estado).to.eql(\"CONFIRMADA\");",
+                  "});",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set(\"citaId\", r.id);",
+                  "if (r.enlaceGestion) pm.collectionVariables.set(\"tokenGestion\", r.enlaceGestion.split(\"/\").pop());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reenviar la MISMA Idempotency-Key (no crea otra)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"devuelve la cita original\", () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"citaId\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mismo cupo con otra clave → 409 + alternativas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 CUPO_OCUPADO\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"CUPO_OCUPADO\");",
+                  "});",
+                  "pm.test(\"trae alternativas\", () => pm.expect(pm.response.json().alternativas).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Ana Gómez\",\n  \"clienteCelular\": \"3109876543\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El EXCLUDE de PostgreSQL rechaza el solape; el servicio responde 409 con los cupos más cercanos."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Validaciones · datos del cliente (todas deben dar 400)",
+      "description": "Una petición por regla. Ninguna llega a la base de datos.",
+      "item": [
+        {
+          "name": "Nombre con HTML/script",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: solo con letras\", () => pm.expect(pm.response.json().mensaje).to.include(\"solo con letras\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"<script>alert('XSS')</script>\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Nombre con símbolos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: solo con letras\", () => pm.expect(pm.response.json().mensaje).to.include(\"solo con letras\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"%/\\\"()/(·&%!\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Nombre de una sola palabra",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: nombre y apellido\", () => pm.expect(pm.response.json().mensaje).to.include(\"nombre y apellido\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juanito\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Nombre con números",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: solo con letras\", () => pm.expect(pm.response.json().mensaje).to.include(\"solo con letras\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez 123\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Nombre de más de 80 caracteres",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: entre 5 y 80\", () => pm.expect(pm.response.json().mensaje).to.include(\"entre 5 y 80\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan PérezPérezPérezPérezPérezPérezPérezPérezPérezPérezPérezPérezPérezPérezPérezPérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Celular 0000000000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: empezar por 3\", () => pm.expect(pm.response.json().mensaje).to.include(\"empezar por 3\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"0000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Celular con +57",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: empezar por 3\", () => pm.expect(pm.response.json().mensaje).to.include(\"empezar por 3\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"+573001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Celular de 9 dígitos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: empezar por 3\", () => pm.expect(pm.response.json().mensaje).to.include(\"empezar por 3\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"300123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Celular enviado como número",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: clienteCelular\", () => pm.expect(pm.response.json().mensaje).to.include(\"clienteCelular\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": 3001234567\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Campo que no está en el contrato",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: no se permite\", () => pm.expect(pm.response.json().mensaje).to.include(\"no se permite\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\",\n  \"estado\": \"ATENDIDA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Hora ya pasada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: ya pasó\", () => pm.expect(pm.response.json().mensaje).to.include(\"ya pasó\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"2026-01-05T15:00:00Z\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Fuera de la grilla (10:17)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: no es un cupo\", () => pm.expect(pm.response.json().mensaje).to.include(\"no es un cupo\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{fecha}}T15:17:00Z\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Madrugada (03:00 Bogotá)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: no es un cupo\", () => pm.expect(pm.response.json().mensaje).to.include(\"no es un cupo\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{fecha}}T08:00:00Z\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Más de 60 días adelante",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: 60 días\", () => pm.expect(pm.response.json().mensaje).to.include(\"60 días\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"2030-01-07T15:00:00Z\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Fecha con formato inválido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: inicio\", () => pm.expect(pm.response.json().mensaje).to.include(\"inicio\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"mañana\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Idempotency-Key que no es UUID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: UUID\", () => pm.expect(pm.response.json().mensaje).to.include(\"UUID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "hola"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sin Idempotency-Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: Idempotency-Key\", () => pm.expect(pm.response.json().mensaje).to.include(\"Idempotency-Key\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/citas",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "citas"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicioId\": \"{{servicioId}}\",\n  \"profesionalId\": \"{{profesionalId}}\",\n  \"inicio\": \"{{inicio}}\",\n  \"clienteNombre\": \"Juan Pérez\",\n  \"clienteCelular\": \"3001234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Disponibilidad de una fecha pasada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: ya pasó\", () => pm.expect(pm.response.json().mensaje).to.include(\"ya pasó\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/publico/{{slug}}/disponibilidad?servicioId={{servicioId}}&fecha=2026-01-05",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "publico",
+                "{{slug}}",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "servicioId",
+                  "value": "{{servicioId}}"
+                },
+                {
+                  "key": "fecha",
+                  "value": "2026-01-05"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Administración · negocio (X-Negocio-Id)",
+      "item": [
+        {
+          "name": "Agenda del día del profesional",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/agenda/{{profesionalId}}?fecha={{fecha}}",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "agenda",
+                "{{profesionalId}}"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "{{fecha}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Registrar resultado de la cita (ATENDIDA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/citas/{{citaId}}/estado",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "citas",
+                "{{citaId}}",
+                "estado"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ATENDIDA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Solo ATENDIDA o NO_ASISTIO. Da 400 si la cita está cancelada o ya tiene resultado."
+          }
+        },
+        {
+          "name": "Sin X-Negocio-Id → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 DATOS_INVALIDOS\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "});",
+                  "pm.test(\"mensaje: X-Negocio-Id\", () => pm.expect(pm.response.json().mensaje).to.include(\"X-Negocio-Id\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/agenda/{{profesionalId}}?fecha={{fecha}}",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "agenda",
+                "{{profesionalId}}"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "{{fecha}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Gestión · el cliente opera su cita (token)",
+      "description": "Va después de Administración porque cancelar deja la cita sin poder registrar resultado. Para ver cancelar en acción, reserva otra en la carpeta 1.",
+      "item": [
+        {
+          "name": "Consultar mi cita",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/gestion/{{tokenGestion}}",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "gestion",
+                "{{tokenGestion}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Cancelar mi cita",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 o 400 si ya tiene resultado\", () => pm.expect(pm.response.code).to.be.oneOf([204, 400, 409]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/v1/gestion/{{tokenGestion}}?confirmar=true",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "gestion",
+                "{{tokenGestion}}"
+              ],
+              "query": [
+                {
+                  "key": "confirmar",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Libera el cupo y publica citas.canceladas por el outbox."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Gateway GraphQL",
+      "item": [
+        {
+          "name": "panelRecepcion (pantalla completa en una consulta)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query PanelRecepcion($fecha: Date) {\n  panelRecepcion(fecha: $fecha) {\n    fecha\n    negocio { nombre zonaHoraria }\n    citasDelDia { horaLocal clienteNombre clienteCelular servicio { nombre } estado }\n    metricasDelMes { desde hasta totalCitas atendidas noAsistio canceladas ocupacion tasaInasistencia }\n  }\n}",
+                "variables": "{\n  \"fecha\": \"{{fecha}}\"\n}"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Analítica",
+      "item": [
+        {
+          "name": "Métricas del periodo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{analiticaUrl}}/v1/metricas?desde=2026-09-01&hasta=2026-12-31",
+              "host": [
+                "{{analiticaUrl}}"
+              ],
+              "path": [
+                "v1",
+                "metricas"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-12-31"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Notificaciones",
+      "item": [
+        {
+          "name": "Mensajes fallidos (citas.dlq)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{notificacionesUrl}}/v1/mensajes-fallidos",
+              "host": [
+                "{{notificacionesUrl}}"
+              ],
+              "path": [
+                "v1",
+                "mensajes-fallidos"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Salud de los servicios",
+      "item": [
+        {
+          "name": "agenda-service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{agendaUrl}}/actuator/health",
+              "host": [
+                "{{agendaUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "notificaciones-service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{notificacionesUrl}}/actuator/health",
+              "host": [
+                "{{notificacionesUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "analitica-service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{analiticaUrl}}/actuator/health",
+              "host": [
+                "{{analiticaUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "gateway-graphql",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gatewayUrl}}/actuator/health",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

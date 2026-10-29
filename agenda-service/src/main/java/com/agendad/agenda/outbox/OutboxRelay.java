@@ -18,10 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
  * enviado. Clave de partición = {@code profesionalId}, para garantizar el
  * orden por profesional (CONTRATO-EVENTOS.md).
  *
- * <p>Sin reintentos con espera ni DLQ todavía: si una publicación falla, se
- * suma un intento y se reintenta en el siguiente ciclo. Eso es Fase 3
- * (issue #16). Apagar Kafka, reservar y volver a encenderlo debe terminar
- * con todos los eventos publicados.
+ * <p>Si una publicación falla, se suma un intento, se corta el lote para no
+ * alterar el orden y todo se reintenta en el siguiente ciclo. Apagar Kafka,
+ * reservar y volver a encenderlo debe terminar con todos los eventos
+ * publicados, en el mismo orden en que se escribieron.
  */
 @Component
 public class OutboxRelay {
@@ -52,6 +52,8 @@ public class OutboxRelay {
                         .get(TIMEOUT_ENVIO_S, TimeUnit.SECONDS);
                 evento.marcarEnviado(Instant.now());
                 publicados++;
+                log.info("Publicado en {} (clave {}): outbox {}",
+                        evento.getTipoEvento(), evento.getClaveParticion(), evento.getId());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 evento.registrarIntentoFallido();
@@ -61,7 +63,11 @@ public class OutboxRelay {
                 evento.registrarIntentoFallido();
                 log.warn("No se pudo publicar el evento de outbox {} (intento {}): {}",
                         evento.getId(), evento.getIntentos(), e.getMessage());
-                // Sin DLQ todavía (Fase 3): queda pendiente para el próximo ciclo.
+                // Se corta el lote: seguir con los siguientes los publicaría
+                // ANTES que este, y el contrato promete orden por
+                // profesionalId (p. ej. una cancelación nunca antes que su
+                // reserva). Este y los demás se reintentan en el próximo ciclo.
+                break;
             }
         }
 

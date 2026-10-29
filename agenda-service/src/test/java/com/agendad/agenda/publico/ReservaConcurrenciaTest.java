@@ -6,7 +6,8 @@ import com.agendad.agenda.comun.error.CupoOcupado;
 import com.agendad.agenda.publico.dto.ReservaRequest;
 import com.agendad.agenda.repositorio.CitaRepository;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -80,11 +81,17 @@ class ReservaConcurrenciaTest {
     private ReservaService reservaService;
 
     @Autowired
+    private DisponibilidadService disponibilidadService;
+
+    @Autowired
     private CitaRepository citaRepository;
 
     @Test
     void cienHilosReservandoElMismoCupoSoloUnoGanaYLosDemasChocanConElExclude() throws InterruptedException {
-        Instant inicio = Instant.now().plus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        // Un cupo que el negocio ofrece de verdad: ValidadorCupo rechaza
+        // horas fuera del horario o de la grilla antes del INSERT, y eso
+        // dejaría la prueba midiendo la validación en vez del EXCLUDE.
+        Instant inicio = primerCupoDeLaura();
 
         CountDownLatch listos = new CountDownLatch(HILOS);
         CountDownLatch salida = new CountDownLatch(1);
@@ -95,9 +102,9 @@ class ReservaConcurrenciaTest {
         try {
             List<Future<?>> resultados = new ArrayList<>(HILOS);
             for (int i = 0; i < HILOS; i++) {
-                String idempotencyKey = "concurrencia-" + i + "-" + UUID.randomUUID();
+                String idempotencyKey = UUID.randomUUID().toString();
                 ReservaRequest peticion = new ReservaRequest(
-                        SERVICIO_CORTE, PROFESIONAL_LAURA, inicio, "Cliente concurrente", "3000000000");
+                        SERVICIO_CORTE, PROFESIONAL_LAURA, inicio, "Cliente Concurrente", "3000000000");
 
                 resultados.add(pool.submit(() -> {
                     listos.countDown();
@@ -130,5 +137,18 @@ class ReservaConcurrenciaTest {
         assertThat(conflictos.get()).as("intentos rechazados por cita_sin_solape").isEqualTo(HILOS - 1);
         assertThat(citaRepository.count()).as("filas en agenda.cita: la BD, no el contador, es la prueba final")
                 .isEqualTo(1);
+    }
+
+    /** Primer cupo libre de Laura a partir de mañana (el seed atiende de lunes a sábado). */
+    private Instant primerCupoDeLaura() {
+        LocalDate manana = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(1);
+        for (int d = 0; d < 7; d++) {
+            var cupos = disponibilidadService
+                    .calcular(SLUG, SERVICIO_CORTE, manana.plusDays(d), PROFESIONAL_LAURA).cupos();
+            if (!cupos.isEmpty()) {
+                return cupos.get(0).inicio();
+            }
+        }
+        throw new AssertionError("El seed no tiene ningún cupo de Laura en la próxima semana");
     }
 }

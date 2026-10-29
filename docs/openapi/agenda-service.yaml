@@ -77,7 +77,9 @@ paths:
         - name: fecha
           in: query
           required: true
-          description: Fecha en hora local del negocio
+          description: |
+            Fecha en hora local del negocio. Desde hoy hasta 60 días
+            adelante; fuera de ese rango responde 400.
           schema:
             type: string
             format: date
@@ -141,6 +143,14 @@ paths:
 
         Reenviar la misma `Idempotency-Key` devuelve la cita original en lugar
         de crear una segunda.
+
+        **Validación estricta (400 `DATOS_INVALIDOS`).** Además del formato de
+        cada campo (ver `ReservaRequest`), `inicio` debe ser un cupo real:
+        en el futuro, a lo sumo 60 días adelante, dentro del horario de
+        atención del profesional, alineado a la grilla de cupos que devuelve
+        `/disponibilidad` y fuera de sus bloqueos. Esto NO valida choques con
+        otras citas: eso sigue siendo trabajo exclusivo del `EXCLUDE`.
+        Campos que no estén en el esquema se rechazan.
       parameters:
         - $ref: '#/components/parameters/Slug'
         - name: Idempotency-Key
@@ -149,6 +159,7 @@ paths:
           description: UUID generado por el cliente antes de enviar
           schema:
             type: string
+            format: uuid
           example: 7d9f2a10-5c31-4e88-b0aa-93c2f1e64d5b
       requestBody:
         required: true
@@ -400,6 +411,7 @@ components:
     ReservaRequest:
       type: object
       required: [servicioId, profesionalId, inicio, clienteNombre, clienteCelular]
+      additionalProperties: false
       properties:
         servicioId:
           type: string
@@ -410,14 +422,24 @@ components:
         inicio:
           type: string
           format: date-time
-          description: En UTC. El fin se calcula con la duración del servicio.
+          description: |
+            En UTC. Debe ser uno de los cupos que devuelve `/disponibilidad`.
+            El fin se calcula con la duración del servicio.
         clienteNombre:
           type: string
-          minLength: 2
-          maxLength: 120
+          minLength: 5
+          maxLength: 80
+          pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*){1,5}$"
+          description: |
+            Nombre y apellido: de 2 a 6 palabras, solo letras (con tildes y
+            ñ), apóstrofo o guion dentro de una palabra. Sin números ni
+            símbolos. Los espacios de sobra se recortan antes de validar.
+          example: Juan Pérez
         clienteCelular:
           type: string
-          pattern: '^[0-9]{10}$'
+          pattern: '^3[0-9]{9}$'
+          description: Celular colombiano, 10 dígitos que empiezan por 3. Sin espacios ni prefijo +57.
+          example: '3001234567'
 
     CitaCreada:
       type: object

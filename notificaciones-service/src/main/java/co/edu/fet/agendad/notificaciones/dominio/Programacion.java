@@ -36,7 +36,11 @@ public class Programacion {
     @Column(name = "enviar_en", nullable = false)
     private Instant enviarEn;
 
-    @Column(name = "canal", nullable = false)
+    // Nulo mientras el aviso está PENDIENTE (recordatorio de 24 h): el canal
+    // lo fija CanalNotificacion al enviarlo. Debe coincidir con
+    // V3__canal_opcional_mientras_pendiente.sql; con nullable = false,
+    // Hibernate rechaza el recordatorio antes de llegar a la base de datos.
+    @Column(name = "canal")
     private String canal;
 
     @Column(name = "destinatario", nullable = false)

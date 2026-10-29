@@ -75,6 +75,8 @@ public class CitasEventoConsumidor {
 
         procesarYMarcar(aviso, evento.eventoId());
         programarRecordatorio24h(evento, horaLocal);
+        log.info("citas.reservadas procesado: evento {} cita {} correlationId {}",
+                evento.eventoId(), evento.citaId(), evento.correlationId());
     }
 
     @KafkaListener(topics = "citas.canceladas", groupId = "notificaciones-service",
@@ -96,6 +98,8 @@ public class CitasEventoConsumidor {
 
         procesarYMarcar(aviso, evento.eventoId());
         cancelarRecordatorioSiExiste(evento.citaId());
+        log.info("citas.canceladas procesado: evento {} cita {} correlationId {}",
+                evento.eventoId(), evento.citaId(), evento.correlationId());
     }
 
     /**
@@ -130,7 +134,7 @@ public class CitasEventoConsumidor {
     private boolean yaProcesado(UUID eventoId) {
         boolean existe = eventoProcesadoRepository.existsById(eventoId);
         if (existe) {
-            log.debug("Evento {} ya procesado, se ignora (reentrega de Kafka)", eventoId);
+            log.info("Evento {} ya procesado, se ignora (reentrega de Kafka)", eventoId);
         }
         return existe;
     }

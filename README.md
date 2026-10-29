@@ -170,7 +170,7 @@ VALUES ('11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-22222222
 docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
-**Perfiles.** `infra` levanta base de datos, Kafka y la consola. `core` añade
+**Perfiles.** `infra` levanta base de datos, Kafka, la consola y pgAdmin. `core` añade
 `agenda-service`. `full` levanta también `notificaciones-service`,
 `gateway-graphql` y `analitica-service` — los cuatro tienen ya su `pom.xml`
 y `Dockerfile`.
@@ -180,12 +180,40 @@ y `Dockerfile`.
 | PostgreSQL | localhost:5432 · `agendad`/`agendad` | activo |
 | Kafka desde el equipo | localhost:29092 | activo |
 | Consola de Kafka | <http://localhost:8090> | activo |
+| pgAdmin (ver los datos guardados) | <http://localhost:5050> · sin login, servidor AGENDA-D ya registrado | activo (`infra`, `full`) |
 | agenda-service | <http://localhost:8081> | activo |
 | gateway GraphQL | <http://localhost:8080/graphiql> | activo |
 | analitica-service | <http://localhost:8083/v1/metricas> | activo |
 | notificaciones-service | localhost:8082 (sin UI, solo `/actuator/health`) | activo |
 
 > Alguien del equipo tiene 8 GB de RAM. Usa el perfil más pequeño que te sirva.
+
+### Probar los endpoints con Postman
+
+Importa [`docs/postman/AGENDA-D.postman_collection.json`](docs/postman/AGENDA-D.postman_collection.json)
+en Postman (*Import → File*). Trae las peticiones de los cuatro servicios,
+agrupadas por carpeta y con sus pruebas: la carpeta 1 busca un cupo libre y
+reserva; las demás reutilizan esa cita. La carpeta 2 tiene un caso por cada
+regla de validación (todas deben dar 400). Con *Run collection* se corren
+todas de una vez.
+
+### Validación de los datos del cliente
+
+`POST /citas` rechaza con 400 y un mensaje en español:
+
+- **Nombre:** nombre y apellido (2 a 6 palabras), 5 a 80 caracteres, solo
+  letras con tildes y ñ; apóstrofo o guion solo dentro de una palabra.
+- **Celular:** 10 dígitos que empiezan por 3, sin espacios ni `+57`.
+- **Inicio:** debe ser un cupo real: en el futuro, a lo sumo 60 días
+  adelante, dentro del horario del profesional, alineado a la grilla de
+  `/disponibilidad` y fuera de sus bloqueos. Que el cupo esté *libre* lo sigue
+  decidiendo solo el `EXCLUDE`.
+- **Idempotency-Key:** UUID.
+- **Cuerpo:** campos que no están en el contrato o con el tipo cambiado
+  (`"clienteCelular": 3001234567`) se rechazan.
+
+Las reglas están en `docs/openapi/agenda-service.yaml` (`ReservaRequest`) y la
+PWA las repite para avisar antes de enviar.
 
 Para bajar todo y empezar de cero:
 
