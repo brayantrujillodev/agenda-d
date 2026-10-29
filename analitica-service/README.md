@@ -11,8 +11,9 @@ para `panelRecepcion.metricasDelMes` y para la query `metricas`.
 - [x] Consume los tres tópicos, deduplica igual que `notificaciones-service`
 - [x] `GET /v1/metricas` (`X-Negocio-Id`, `desde`, `hasta`)
 - [x] `gateway-graphql` ya no usa el stub fijo de métricas
-- [ ] `topServicios` — devuelve vacío: la tabla solo guarda `servicioId`, no
-      el nombre del servicio (requiere leer `agenda.servicio`, otro esquema)
+- [x] `topServicios` — devuelve `servicioId` y cantidad (los 5 más
+      reservados); el nombre lo pone `gateway-graphql` con el catálogo de
+      `agenda-service`, sin cruzar esquemas (P3 – Entrega 1)
 - [ ] `ocupacion` real contra `agenda.horario_atencion` — hoy usa una
       jornada configurable (ver abajo), no el horario real de cada
       profesional
