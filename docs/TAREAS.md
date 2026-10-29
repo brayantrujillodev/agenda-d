@@ -264,8 +264,9 @@ eventos aparecen publicados. **Demo estrella de la sustentación.**
 
 - [x] `pom.xml` + esqueleto Spring Boot con Spring for GraphQL
 - [x] Esquema cargado desde `docs/graphql/schema.graphqls` (idéntico al contrato)
-- [x] Resolver de `panelRecepcion` llamando a `agenda-service` por REST, con
-      fallback a datos de ejemplo si el backend no responde
+- [x] Resolver de `panelRecepcion` llamando a `agenda-service` por REST
+      (el fallback a datos de ejemplo se quitó en #23: un servicio caído es
+      un error GraphQL, no una cita inventada)
 - [x] `/graphiql` habilitado para la demostración
 
 **Aceptación:** una sola consulta devuelve agenda del día + configuración.
@@ -315,16 +316,15 @@ punta contra el backend real.
 
 ---
 
-### 🟢 #14 · Configuración del negocio
+### ✅ #14 · Configuración del negocio — cerrado (P3 – Entrega 1)
 
-**Asignado:** ~~Luis~~ → **Brayan**, si sobra tiempo tras la revisión cruzada
-**Toca:** `.../controller/ConfiguracionController.java` · **Depende de:** #6
+**Asignado:** ~~Luis~~ → **Brayan**
+**Toca:** `agenda-service/.../configuracion/` · **Depende de:** #6
 
-No existe todavía ningún `ConfiguracionController`. No bloquea el cierre de
-Fase 2, así que solo se toma si Luis sigue ocupado con `gateway-graphql` (#11).
-
-- [ ] CRUD de servicios y profesionales, horarios y bloqueos
-- [ ] Todos leen `X-Negocio-Id`
+- [x] CRUD de servicios y profesionales, horarios y bloqueos
+      (`ConfiguracionController`, contrato en `docs/openapi/agenda-service.yaml`)
+- [x] Todos leen `X-Negocio-Id` — probado contra Postgres real en
+      `SeparacionEntreNegociosTest`
 
 **Aceptación:** con el `X-Negocio-Id` de un negocio no se ven datos de otro.
 
@@ -468,9 +468,9 @@ marcarla `ATENDIDA` y ver las cifras reales en `GET /v1/metricas` y en
 > `ocupacion` estima minutos disponibles con una jornada configurable
 > (600 min/día por defecto) en vez de leer `agenda.horario_atencion` —
 > cruzar esquemas entre servicios no es el patrón del proyecto.
-> `topServicios` devuelve vacío: la tabla solo guarda `servicioId`, no el
-> nombre. Ambas son mejoras válidas para retomar después, no bloquean el
-> cierre de esta tarea.
+> Es una mejora válida para retomar después, no bloquea el cierre de esta
+> tarea. (`topServicios` ya no es vacío desde #23: analitica devuelve el
+> `servicioId` y el gateway le pone el nombre.)
 
 ### ✅ #20 · PWA · panel de recepción — cerrado
 
@@ -514,6 +514,24 @@ contra Postgres real, no como algo que "se supone que funciona".
 - [x] `docs/GUION-SUSTENTACION.md` actualizado con Fase 3 completa
 - [ ] Ensayar la sustentación dos veces — **pendiente del equipo, no es
       trabajo de código**
+
+### ✅ #23 · P3 – Entrega 1 · gateway GraphQL completo — cerrado
+
+**Depende de:** #11, #14
+
+- [x] Sin datos de ejemplo: un servicio caído es un error GraphQL, no una cita inventada
+- [x] `X-Negocio-Id` y `X-Correlation-Id` de la petición reenviados a cada servicio
+- [x] Las 8 mutaciones del esquema implementadas contra `agenda-service`
+- [x] `bloqueos`, `Profesional.agenda` y `Metricas.topServicios` con resolver real
+- [x] Errores en formato GraphQL: `message` en español, `extensions.codigo`, `classification`
+- [x] Respuesta parcial: `metricasDelMes` en null si analitica cae
+- [x] Validación de inputs, profundidad y complejidad máximas, rate limit, timeouts
+- [x] Introspección y GraphiQL apagados en el perfil `prod`
+- [x] 30 pruebas en el gateway (antes 0)
+- [x] Evidencia reproducible en `docs/evidencias/`
+
+**Aceptación:** `node docs/evidencias/flujo-p3.mjs` termina con 31/31 contra
+el stack real.
 
 ---
 

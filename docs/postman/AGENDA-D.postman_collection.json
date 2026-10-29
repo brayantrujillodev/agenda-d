@@ -56,6 +56,22 @@
     {
       "key": "tokenGestion",
       "value": ""
+    },
+    {
+      "key": "gqlServicioId",
+      "value": ""
+    },
+    {
+      "key": "gqlProfesionalId",
+      "value": ""
+    },
+    {
+      "key": "bloqueoInicio",
+      "value": ""
+    },
+    {
+      "key": "bloqueoFin",
+      "value": ""
     }
   ],
   "item": [
@@ -1527,6 +1543,784 @@
               "graphql": {
                 "query": "query PanelRecepcion($fecha: Date) {\n  panelRecepcion(fecha: $fecha) {\n    fecha\n    negocio { nombre zonaHoraria }\n    citasDelDia { horaLocal clienteNombre clienteCelular servicio { nombre } estado }\n    metricasDelMes { desde hasta totalCitas atendidas noAsistio canceladas ocupacion tasaInasistencia }\n  }\n}",
                 "variables": "{\n  \"fecha\": \"{{fecha}}\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "negocio (configuración desde agenda-service)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.test(\"los datos vienen de agenda-service\", () => pm.expect(pm.response.json().data.negocio.nombre).to.eql(\"Barbería El Corte\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  negocio {\n    nombre slugPublico zonaHoraria\n    servicios { id nombre duracionMin precio activo }\n    profesionales { id nombre servicios { nombre } horarios { diaSemana horaInicio horaFin } }\n  }\n}",
+                "variables": "{}"
+              }
+            }
+          }
+        },
+        {
+          "name": "agenda(profesionalId, fecha)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query Agenda($p: ID!, $f: Date!) {\n  agenda(profesionalId: $p, fecha: $f) { id horaLocal clienteNombre clienteCelular estado servicio { nombre } }\n}",
+                "variables": "{\n  \"p\": \"{{profesionalId}}\",\n  \"f\": \"{{fecha}}\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "metricas(desde, hasta) con topServicios nombrados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query Metricas($d: Date!, $h: Date!) {\n  metricas(desde: $d, hasta: $h) {\n    totalCitas atendidas noAsistio canceladas ocupacion tasaInasistencia\n    topServicios { cantidad servicio { nombre } }\n  }\n}",
+                "variables": "{\n  \"d\": \"2026-01-01\",\n  \"h\": \"2026-12-31\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "crearServicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.collectionVariables.set(\"gqlServicioId\", pm.response.json().data.crearServicio.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Crear($e: ServicioInput!) {\n  crearServicio(entrada: $e) { id nombre duracionMin precio activo }\n}",
+                "variables": "{\n  \"e\": {\n    \"nombre\": \"Corte y barba\",\n    \"duracionMin\": 90,\n    \"precio\": 35000\n  }\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "actualizarServicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.test(\"precio con 2 decimales\", () => pm.expect(pm.response.json().data.actualizarServicio.precio).to.eql(\"40000.00\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Actualizar($id: ID!, $e: ServicioInput!) {\n  actualizarServicio(id: $id, entrada: $e) { id nombre precio }\n}",
+                "variables": "{\n  \"id\": \"{{gqlServicioId}}\",\n  \"e\": {\n    \"nombre\": \"Corte y barba premium\",\n    \"duracionMin\": 90,\n    \"precio\": 40000\n  }\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "crearProfesional",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.collectionVariables.set(\"gqlProfesionalId\", pm.response.json().data.crearProfesional.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Crear($e: ProfesionalInput!) {\n  crearProfesional(entrada: $e) { id nombre activo servicios { nombre } }\n}",
+                "variables": "{\n  \"e\": {\n    \"nombre\": \"Camila\",\n    \"serviciosIds\": [\n      \"{{gqlServicioId}}\",\n      \"{{servicioId}}\"\n    ]\n  }\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "definirHorario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.test(\"2 franjas\", () => pm.expect(pm.response.json().data.definirHorario.horarios).to.have.length(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Horario($p: ID!, $h: [HorarioInput!]!) {\n  definirHorario(profesionalId: $p, horarios: $h) { nombre horarios { diaSemana horaInicio horaFin } }\n}",
+                "variables": "{\n  \"p\": \"{{gqlProfesionalId}}\",\n  \"h\": [\n    {\n      \"diaSemana\": 1,\n      \"horaInicio\": \"08:00\",\n      \"horaFin\": \"12:00\"\n    },\n    {\n      \"diaSemana\": 1,\n      \"horaInicio\": \"14:00\",\n      \"horaFin\": \"18:00\"\n    }\n  ]\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "crearBloqueo (rango libre, 40 días adelante)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + 40 * 86400e3).toISOString().slice(0, 10);",
+                  "pm.collectionVariables.set(\"bloqueoInicio\", d + \"T13:00:00Z\");",
+                  "pm.collectionVariables.set(\"bloqueoFin\", d + \"T23:00:00Z\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Bloquear($e: BloqueoInput!) {\n  crearBloqueo(entrada: $e) { id inicio fin motivo }\n}",
+                "variables": "{\n  \"e\": {\n    \"profesionalId\": \"{{gqlProfesionalId}}\",\n    \"inicio\": \"{{bloqueoInicio}}\",\n    \"fin\": \"{{bloqueoFin}}\",\n    \"motivo\": \"Capacitación\"\n  }\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "bloqueos(profesionalId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.test(\"incluye el bloqueo recién creado\", () => pm.expect(pm.response.json().data.bloqueos).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query Bloqueos($p: ID!) {\n  bloqueos(profesionalId: $p) { id inicio fin motivo }\n}",
+                "variables": "{\n  \"p\": \"{{gqlProfesionalId}}\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "cancelarCita (la de la carpeta 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Si la carpeta 3 ya registró la asistencia de esta cita, agenda-service",
+                  "// no deja cancelarla y el gateway devuelve su mensaje: los dos son correctos.",
+                  "pm.test(\"cancelada, o rechazada por tener ya un resultado\", () => {",
+                  "  const r = pm.response.json();",
+                  "  if (r.errors) pm.expect(r.errors[0].extensions.codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "  else pm.expect(r.data.cancelarCita.estado).to.eql(\"CANCELADA\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Cancelar($c: ID!) {\n  cancelarCita(citaId: $c, motivo: \"El profesional se incapacitó\") { id estado horaLocal }\n}",
+                "variables": "{\n  \"c\": \"{{citaId}}\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "registrarAsistencia con estado no permitido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"error DATOS_INVALIDOS en formato GraphQL\", () => {",
+                  "  const e = pm.response.json().errors;",
+                  "  pm.expect(e).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(e[0].extensions.codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "  pm.expect(e[0].message).to.be.a(\"string\");",
+                  "  pm.expect(JSON.stringify(e)).to.not.include(\"Exception\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Asistencia($c: ID!) {\n  registrarAsistencia(citaId: $c, estado: CANCELADA) { id }\n}",
+                "variables": "{\n  \"c\": \"{{citaId}}\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "desactivarServicio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 sin errores GraphQL\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().errors).to.be.undefined;",
+                  "});",
+                  "pm.test(\"true\", () => pm.expect(pm.response.json().data.desactivarServicio).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Desactivar($id: ID!) {\n  desactivarServicio(id: $id)\n}",
+                "variables": "{\n  \"id\": \"{{gqlServicioId}}\"\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "ERROR · sin cabecera X-Negocio-Id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"error DATOS_INVALIDOS en formato GraphQL\", () => {",
+                  "  const e = pm.response.json().errors;",
+                  "  pm.expect(e).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(e[0].extensions.codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "  pm.expect(e[0].message).to.be.a(\"string\");",
+                  "  pm.expect(JSON.stringify(e)).to.not.include(\"Exception\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { negocio { nombre } }",
+                "variables": "{}"
+              }
+            }
+          }
+        },
+        {
+          "name": "ERROR · negocio inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"error NO_ENCONTRADO en formato GraphQL\", () => {",
+                  "  const e = pm.response.json().errors;",
+                  "  pm.expect(e).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(e[0].extensions.codigo).to.eql(\"NO_ENCONTRADO\");",
+                  "  pm.expect(e[0].message).to.be.a(\"string\");",
+                  "  pm.expect(JSON.stringify(e)).to.not.include(\"Exception\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "99999999-9999-9999-9999-999999999999"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { negocio { nombre } }",
+                "variables": "{}"
+              }
+            }
+          }
+        },
+        {
+          "name": "ERROR · input inválido (se rechaza en el gateway)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"error DATOS_INVALIDOS en formato GraphQL\", () => {",
+                  "  const e = pm.response.json().errors;",
+                  "  pm.expect(e).to.be.an(\"array\").that.is.not.empty;",
+                  "  pm.expect(e[0].extensions.codigo).to.eql(\"DATOS_INVALIDOS\");",
+                  "  pm.expect(e[0].message).to.be.a(\"string\");",
+                  "  pm.expect(JSON.stringify(e)).to.not.include(\"Exception\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation Crear($e: ServicioInput!) {\n  crearServicio(entrada: $e) { id }\n}",
+                "variables": "{\n  \"e\": {\n    \"nombre\": \"X\",\n    \"duracionMin\": 2,\n    \"precio\": -5\n  }\n}"
+              }
+            }
+          }
+        },
+        {
+          "name": "ERROR · consulta demasiado profunda",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"se corta por profundidad\", () => pm.expect(pm.response.json().errors[0].message).to.include(\"demasiado profunda\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Negocio-Id",
+                "value": "{{negocioId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/graphql",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{ negocio { profesionales { agenda { profesional { agenda { profesional { agenda { profesional { agenda { profesional { agenda { profesional { agenda { profesional { agenda { profesional { agenda { profesional { id } } } } } } } } } } } } } } } } } } }",
+                "variables": "{}"
               }
             }
           }

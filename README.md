@@ -36,8 +36,8 @@ completo de `docs/TAREAS.md`.
 | Migración con el `EXCLUDE` (`db/V1__esquema_inicial.sql`) | ✅ en el repo |
 | `agenda-service` | ✅ completo — servicios, disponibilidad, reserva con outbox, gestión por token, agenda del profesional y registro de asistencia ([#6](../../pull/6), [#7](../../pull/7), [#10](../../pull/10), [#11](../../pull/11), [#20](../../pull/20)) |
 | `notificaciones-service` | ✅ consume `citas.reservadas`/`citas.canceladas`/`citas.estado`, deduplica por `eventoId`, reintentos + DLQ (`citas.dlq`), recordatorio de 24h con recuperación tras reinicio ([#9](../../pull/9), [#32](../../pull/32), [#33](../../pull/33)) |
-| `gateway-graphql` | ✅ `panelRecepcion` contra `agenda-service` real, verificado con una reserva real de punta a punta ([#14](../../pull/14), fix de URI en [#23](../../pull/23)) |
-| `analitica-service` | ✅ consume los tres tópicos, actualiza `metrica_diaria`, `GET /v1/metricas`, reintentos + DLQ compartida con notificaciones-service |
+| `gateway-graphql` | ✅ 5 queries y 8 mutaciones contra `agenda-service` y `analitica-service` reales; `X-Negocio-Id` reenviado a cada servicio; errores en formato GraphQL con `extensions.codigo`; respuestas parciales; límites de profundidad, complejidad y peticiones por minuto; sin introspección en `prod`. 30 pruebas. Evidencia: [`docs/evidencias/P3-ENTREGA-1.md`](docs/evidencias/P3-ENTREGA-1.md) |
+| `analitica-service` | ✅ consume los tres tópicos, actualiza `metrica_diaria`, `GET /v1/metricas` (con `topServicios` por `servicioId`), reintentos + DLQ compartida con notificaciones-service |
 | PWA de reserva | ✅ flujo completo contra `agenda-service` real, instalable ([#12](../../pull/12), [#17](../../pull/17), [#18](../../pull/18), [#19](../../pull/19)) |
 | PWA · panel de recepción | ✅ agenda del día + métricas + alerta de DLQ en una sola consulta GraphQL, verificado en navegador real ([#34](../../pull/34)) |
 | Prueba de separación entre negocios | ✅ contra Postgres real, Testcontainers ([#31](../../pull/31)) |
@@ -49,6 +49,47 @@ completo de `docs/TAREAS.md`.
 respondiera bien — no usar esa versión, se deja el tag por trazabilidad.
 `analitica-service` es posterior a este tag, todavía no tiene su propia
 imagen publicada.)
+
+> **P3 – Entrega 1 · 2026-10-28 · gateway GraphQL completo.** Una
+> auditoría del gateway encontró que, si un servicio fallaba, devolvía
+> **datos inventados** (una cita de "Juan Pérez", métricas en cero), que el
+> negocio y la profesional estaban fijos en el código, que ninguna de las 8
+> mutaciones del esquema estaba implementada y que no tenía pruebas. Se
+> corrigió todo:
+>
+> - **Sin datos inventados.** Un servicio caído es un error GraphQL
+>   (`SERVICIO_NO_DISPONIBLE`) en el campo que lo pidió.
+>   `metricasDelMes` ahora admite null: si analitica cae, la agenda del día
+>   sale igual (cambio de contrato en `docs/graphql/schema.graphqls`).
+> - **`X-Negocio-Id` de verdad.** El gateway toma la cabecera de la petición
+>   y la reenvía a cada servicio, junto con `X-Correlation-Id`.
+> - **Las 8 mutaciones**, respaldadas por endpoints nuevos de
+>   `agenda-service` (contrato primero, en `docs/openapi/agenda-service.yaml`):
+>   `GET /v1/negocio`, `POST/PUT/DELETE /v1/servicios`, `POST /v1/profesionales`,
+>   `PUT /v1/profesionales/{id}/horarios`, `GET /v1/profesionales/{id}/bloqueos`,
+>   `POST /v1/bloqueos` (409 `CITAS_EN_RANGO`), `GET /v1/citas/{id}` y
+>   `POST /v1/citas/{id}/cancelacion` (publica `citas.canceladas` con
+>   `canceladaPor: NEGOCIO` por outbox).
+> - **`topServicios`** ya no es vacío: analitica devuelve `servicioId` y el
+>   gateway le pone el nombre con el catálogo de agenda.
+> - **Seguridad básica:** validación de inputs, límite de profundidad (15) y
+>   de complejidad (300), 120 peticiones/minuto por IP (429 con
+>   `Retry-After`), timeouts HTTP, introspección y GraphiQL apagados en el
+>   perfil `prod`. La autenticación sigue fuera de alcance por acuerdo con el
+>   docente.
+> - **Bug real encontrado al probar contra Docker:** el cliente HTTP usaba
+>   `HttpURLConnection`, que no admite `PATCH`; `registrarAsistencia` fallaba
+>   siempre. Ahora usa el cliente del JDK, con una prueba de regresión.
+>
+> Pruebas: gateway 30 (antes 0), agenda-service 69, analitica-service 9.
+> Evidencia reproducible: `node docs/evidencias/flujo-p3.mjs` recorre el flujo
+> completo contra el stack real y regenera
+> [`docs/evidencias/P3-ENTREGA-1.md`](docs/evidencias/P3-ENTREGA-1.md) (31/31
+> verificaciones), y [`docs/evidencias/newman-coleccion.txt`](docs/evidencias/newman-coleccion.txt)
+> es la colección de Postman completa corrida con Newman (51 peticiones, 77
+> aserciones, 0 fallos).
+
+Avances anteriores:
 
 > **Avance · 2026-09-24.** Se construyó `analitica-service` completo,
 > adelantado de Fase 3 (docs/TAREAS.md #19) porque Luis no está activo y el
@@ -194,8 +235,13 @@ Importa [`docs/postman/AGENDA-D.postman_collection.json`](docs/postman/AGENDA-D.
 en Postman (*Import → File*). Trae las peticiones de los cuatro servicios,
 agrupadas por carpeta y con sus pruebas: la carpeta 1 busca un cupo libre y
 reserva; las demás reutilizan esa cita. La carpeta 2 tiene un caso por cada
-regla de validación (todas deben dar 400). Con *Run collection* se corren
-todas de una vez.
+regla de validación (todas deben dar 400). La carpeta 5 tiene cada query y
+mutación del gateway y sus casos de error. Con *Run collection* se corren
+todas de una vez; desde la terminal:
+
+```bash
+npx newman run docs/postman/AGENDA-D.postman_collection.json
+```
 
 ### Validación de los datos del cliente
 
