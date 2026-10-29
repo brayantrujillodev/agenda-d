@@ -1,56 +1,41 @@
 package com.agendad.gateway.client;
 
-import com.agendad.gateway.model.Metricas;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import static com.agendad.gateway.contexto.ContextoNegocio.CABECERA_CORRELACION;
+import static com.agendad.gateway.contexto.ContextoNegocio.CABECERA_NEGOCIO;
+
+import com.agendad.gateway.client.dto.MetricasDto;
+import java.time.LocalDate;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-import java.time.LocalDate;
-import java.util.List;
-
+/**
+ * Cliente HTTP de analitica-service (contrato:
+ * docs/openapi/analitica-service.yaml). Si no responde, el error sube al
+ * campo que lo pidió: el gateway no devuelve ceros que parezcan reales.
+ */
 @Service
 public class AnaliticaClient {
 
-    private static final Logger log = LoggerFactory.getLogger(AnaliticaClient.class);
+    static final String NOMBRE = "el servicio de métricas";
 
-    private final RestClient restClient;
-    private final String analiticaUrl;
-    private final String negocioId;
+    private final RestClient http;
 
-    public AnaliticaClient(RestClient restClient,
-                            @Value("${AGENDAD_ANALITICA_URL:http://localhost:8083}") String analiticaUrl,
-                            @Value("${AGENDAD_NEGOCIO_ID:11111111-1111-1111-1111-111111111111}") String negocioId) {
-        this.restClient = restClient;
-        this.analiticaUrl = analiticaUrl;
-        this.negocioId = negocioId;
+    public AnaliticaClient(@Qualifier("analiticaRestClient") RestClient http) {
+        this.http = http;
     }
 
-    public Metricas metricas(LocalDate desde, LocalDate hasta) {
-        try {
-            MetricasResponse response = restClient.get()
-                    .uri(analiticaUrl + "/v1/metricas?desde={desde}&hasta={hasta}", desde, hasta)
-                    .header("X-Negocio-Id", negocioId)
-                    .retrieve()
-                    .body(MetricasResponse.class);
-            if (response != null) {
-                return new Metricas(response.desde(), response.hasta(), response.totalCitas(),
-                        response.atendidas(), response.noAsistio(), response.canceladas(),
-                        response.ocupacion(), response.tasaInasistencia(), List.of());
-            }
-        } catch (RestClientException e) {
-            log.warn("No se pudo consultar métricas en analitica-service, usando ceros: {}", e.getMessage());
-        }
-        return metricasVacias(desde, hasta);
-    }
-
-    private Metricas metricasVacias(LocalDate desde, LocalDate hasta) {
-        return new Metricas(desde, hasta, 0, 0, 0, 0, 0.0, 0.0, List.of());
-    }
-
-    private record MetricasResponse(LocalDate desde, LocalDate hasta, int totalCitas, int atendidas,
-                                     int noAsistio, int canceladas, double ocupacion, double tasaInasistencia) {
+    public MetricasDto metricas(UUID negocioId, String correlationId, LocalDate desde, LocalDate hasta) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.get()
+                .uri("/v1/metricas?desde={desde}&hasta={hasta}", desde, hasta)
+                .headers(h -> {
+                    h.set(CABECERA_NEGOCIO, negocioId.toString());
+                    if (correlationId != null) {
+                        h.set(CABECERA_CORRELACION, correlationId);
+                    }
+                })
+                .retrieve()
+                .body(MetricasDto.class));
     }
 }

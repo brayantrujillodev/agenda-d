@@ -1,124 +1,176 @@
 package com.agendad.gateway.client;
 
-import com.agendad.gateway.model.Cita;
-import com.agendad.gateway.model.HorarioAtencion;
-import com.agendad.gateway.model.Negocio;
-import com.agendad.gateway.model.Profesional;
-import com.agendad.gateway.model.Servicio;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import static com.agendad.gateway.contexto.ContextoNegocio.CABECERA_CORRELACION;
+import static com.agendad.gateway.contexto.ContextoNegocio.CABECERA_NEGOCIO;
+
+import com.agendad.gateway.client.dto.BloqueoDto;
+import com.agendad.gateway.client.dto.CitaDto;
+import com.agendad.gateway.client.dto.HorarioDto;
+import com.agendad.gateway.client.dto.NegocioConfigDto;
+import com.agendad.gateway.client.dto.ProfesionalDto;
+import com.agendad.gateway.client.dto.ServicioDto;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.List;
-import java.util.UUID;
-
+/**
+ * Cliente HTTP de agenda-service (contrato: docs/openapi/agenda-service.yaml).
+ * Toda llamada lleva el {@code X-Negocio-Id} de la petición GraphQL: el
+ * gateway nunca decide de qué negocio son los datos.
+ *
+ * <p>Los errores del servicio se convierten en {@code ErrorGateway} con su
+ * mismo código y mensaje ({@link TraductorErroresHttp}); si el servicio no
+ * responde, en {@code SERVICIO_NO_DISPONIBLE} ({@link LlamadaRemota}).
+ */
 @Service
 public class AgendaClient {
 
-    private static final Logger log = LoggerFactory.getLogger(AgendaClient.class);
+    static final String NOMBRE = "el servicio de agenda";
 
-    private static final String SERVICIO_CORTE_ID = "22222222-2222-2222-2222-222222222222";
-    private static final String SERVICIO_BARBA_ID = "22222222-2222-2222-2222-222222222223";
+    private final RestClient http;
 
-    private final RestClient restClient;
-    private final String agendaUrl;
-    private final String negocioSlug;
-    private final String negocioId;
-    private final String profesionalId;
-
-    public AgendaClient(RestClient restClient,
-                        @Value("${AGENDAD_AGENDA_URL:http://localhost:8081}") String agendaUrl,
-                        @Value("${AGENDAD_NEGOCIO_SLUG:barberia-el-corte}") String negocioSlug,
-                        @Value("${AGENDAD_NEGOCIO_ID:11111111-1111-1111-1111-111111111111}") String negocioId,
-                        @Value("${AGENDAD_PROFESIONAL_ID:33333333-3333-3333-3333-333333333333}") String profesionalId) {
-        this.restClient = restClient;
-        this.agendaUrl = agendaUrl;
-        this.negocioSlug = negocioSlug;
-        this.negocioId = negocioId;
-        this.profesionalId = profesionalId;
+    public AgendaClient(@Qualifier("agendaRestClient") RestClient http) {
+        this.http = http;
     }
 
-    public List<Servicio> servicios() {
-        try {
-            List<ServicioResponse> response = restClient.get()
-                    .uri(agendaUrl + "/v1/publico/{slug}/servicios", negocioSlug)
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
-            if (response != null && !response.isEmpty()) {
-                return response.stream().map(this::toServicio).toList();
-            }
-        } catch (RestClientException e) {
-            log.warn("No se pudo consultar servicios en agenda-service, usando datos de ejemplo: {}", e.getMessage());
+    public NegocioConfigDto negocio(UUID negocioId, String correlationId) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.get()
+                .uri("/v1/negocio")
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .retrieve()
+                .body(NegocioConfigDto.class));
+    }
+
+    public List<CitaDto> agenda(UUID negocioId, String correlationId, UUID profesionalId, LocalDate fecha) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.get()
+                .uri("/v1/agenda/{profesionalId}?fecha={fecha}", profesionalId, fecha)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<CitaDto>>() {}));
+    }
+
+    public CitaDto cita(UUID negocioId, String correlationId, UUID citaId) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.get()
+                .uri("/v1/citas/{id}", citaId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .retrieve()
+                .body(CitaDto.class));
+    }
+
+    public List<BloqueoDto> bloqueos(UUID negocioId, String correlationId, UUID profesionalId) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.get()
+                .uri("/v1/profesionales/{id}/bloqueos", profesionalId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<BloqueoDto>>() {}));
+    }
+
+    // --- Escrituras ---------------------------------------------------
+
+    public ServicioDto crearServicio(UUID negocioId, String correlationId,
+                                     String nombre, int duracionMin, BigDecimal precio) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.post()
+                .uri("/v1/servicios")
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("nombre", nombre, "duracionMin", duracionMin, "precio", precio))
+                .retrieve()
+                .body(ServicioDto.class));
+    }
+
+    public ServicioDto actualizarServicio(UUID negocioId, String correlationId, UUID servicioId,
+                                          String nombre, int duracionMin, BigDecimal precio) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.put()
+                .uri("/v1/servicios/{id}", servicioId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("nombre", nombre, "duracionMin", duracionMin, "precio", precio))
+                .retrieve()
+                .body(ServicioDto.class));
+    }
+
+    public void desactivarServicio(UUID negocioId, String correlationId, UUID servicioId) {
+        LlamadaRemota.ejecutar(NOMBRE, () -> http.delete()
+                .uri("/v1/servicios/{id}", servicioId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .retrieve()
+                .toBodilessEntity());
+    }
+
+    public ProfesionalDto crearProfesional(UUID negocioId, String correlationId,
+                                           String nombre, List<UUID> serviciosIds) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.post()
+                .uri("/v1/profesionales")
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("nombre", nombre, "serviciosIds", serviciosIds))
+                .retrieve()
+                .body(ProfesionalDto.class));
+    }
+
+    public ProfesionalDto definirHorario(UUID negocioId, String correlationId, UUID profesionalId,
+                                         List<HorarioDto> horarios) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.put()
+                .uri("/v1/profesionales/{id}/horarios", profesionalId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(horarios)
+                .retrieve()
+                .body(ProfesionalDto.class));
+    }
+
+    public BloqueoDto crearBloqueo(UUID negocioId, String correlationId, UUID profesionalId,
+                                   Instant inicio, Instant fin, String motivo) {
+        Map<String, Object> cuerpo = new LinkedHashMap<>();
+        cuerpo.put("profesionalId", profesionalId);
+        cuerpo.put("inicio", inicio);
+        cuerpo.put("fin", fin);
+        if (motivo != null) {
+            cuerpo.put("motivo", motivo);
         }
-        return serviciosDeEjemplo();
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.post()
+                .uri("/v1/bloqueos")
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(cuerpo)
+                .retrieve()
+                .body(BloqueoDto.class));
     }
 
-    public List<Cita> citas(LocalDate fecha, List<Servicio> servicios) {
-        try {
-            List<CitaResponse> response = restClient.get()
-                    .uri(agendaUrl + "/v1/agenda/{profesionalId}?fecha={fecha}", profesionalId, fecha)
-                    .header("X-Negocio-Id", negocioId)
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
-            if (response != null) {
-                return response.stream().map(item -> toCita(item, servicios)).toList();
-            }
-        } catch (RestClientException e) {
-            log.warn("No se pudo consultar la agenda de {} en agenda-service, usando datos de ejemplo: {}",
-                    profesionalId, e.getMessage());
+    public void registrarAsistencia(UUID negocioId, String correlationId, UUID citaId, String estado) {
+        LlamadaRemota.ejecutar(NOMBRE, () -> http.patch()
+                .uri("/v1/citas/{id}/estado", citaId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("estado", estado))
+                .retrieve()
+                .toBodilessEntity());
+    }
+
+    public CitaDto cancelarCita(UUID negocioId, String correlationId, UUID citaId, String motivo) {
+        return LlamadaRemota.ejecutar(NOMBRE, () -> http.post()
+                .uri("/v1/citas/{id}/cancelacion", citaId)
+                .headers(h -> cabeceras(h, negocioId, correlationId))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(motivo == null ? Map.of() : Map.of("motivo", motivo))
+                .retrieve()
+                .body(CitaDto.class));
+    }
+
+    private static void cabeceras(HttpHeaders h, UUID negocioId, String correlationId) {
+        h.set(CABECERA_NEGOCIO, negocioId.toString());
+        if (correlationId != null) {
+            h.set(CABECERA_CORRELACION, correlationId);
         }
-        return citasDeEjemplo(fecha, servicios);
     }
-
-    public Negocio negocio(List<Servicio> servicios) {
-        Profesional profesional = new Profesional(
-                profesionalId, "Laura", true, servicios,
-                List.of(new HorarioAtencion(1, "08:00", "18:00"),
-                        new HorarioAtencion(2, "08:00", "18:00")));
-        return new Negocio(negocioId, "El Corte", negocioSlug, "America/Bogota",
-                servicios, List.of(profesional));
-    }
-
-    private Cita toCita(CitaResponse item, List<Servicio> servicios) {
-        Servicio servicio = servicios.stream()
-                .filter(candidate -> candidate.nombre().equals(item.servicioNombre()))
-                .findFirst()
-                .orElse(servicios.getFirst());
-        Profesional profesional = new Profesional(profesionalId, item.profesionalNombre(), true,
-                servicios, List.of());
-        return new Cita(item.id(), item.inicio(), item.fin(), item.horaLocal(), servicio,
-                profesional, item.clienteNombre(), item.clienteCelular(), item.estado());
-    }
-
-    private List<Servicio> serviciosDeEjemplo() {
-        return List.of(
-                new Servicio(SERVICIO_CORTE_ID, "Corte de cabello", 60, new BigDecimal("25000"), true),
-                new Servicio(SERVICIO_BARBA_ID, "Barba", 30, new BigDecimal("15000"), true));
-    }
-
-    private List<Cita> citasDeEjemplo(LocalDate fecha, List<Servicio> servicios) {
-        Servicio servicio = servicios.getFirst();
-        var inicio = fecha.atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(8 * 3600L);
-        var fin = inicio.plusSeconds(3600L);
-        Profesional profesional = new Profesional(profesionalId, "Laura", true, servicios, List.of());
-        return List.of(new Cita(UUID.nameUUIDFromBytes((fecha + "-cita").getBytes()).toString(),
-                inicio, fin, "08:00", servicio, profesional, "Juan Pérez", "300****567", "CONFIRMADA"));
-    }
-
-    private Servicio toServicio(ServicioResponse item) {
-        return new Servicio(item.id(), item.nombre(), item.duracionMin(), item.precio(), true);
-    }
-
-    private record ServicioResponse(String id, String nombre, int duracionMin, BigDecimal precio) {}
-
-    private record CitaResponse(String id, java.time.Instant inicio, java.time.Instant fin,
-                                String horaLocal, String servicioNombre, String profesionalNombre,
-                                String clienteNombre, String clienteCelular, String estado) {}
 }
