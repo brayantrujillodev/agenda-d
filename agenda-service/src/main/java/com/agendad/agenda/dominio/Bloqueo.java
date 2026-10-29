@@ -33,6 +33,14 @@ public class Bloqueo {
     protected Bloqueo() {
     }
 
+    public Bloqueo(UUID negocioId, UUID profesionalId, Instant inicio, Instant fin, String motivo) {
+        this.negocioId = negocioId;
+        this.profesionalId = profesionalId;
+        this.inicio = inicio;
+        this.fin = fin;
+        this.motivo = motivo;
+    }
+
     public UUID getId() {
         return id;
     }

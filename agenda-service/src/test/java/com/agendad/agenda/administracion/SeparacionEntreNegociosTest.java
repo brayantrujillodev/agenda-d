@@ -3,7 +3,10 @@ package com.agendad.agenda.administracion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.agendad.agenda.comun.error.Conflicto;
 import com.agendad.agenda.comun.error.RecursoNoEncontrado;
+import com.agendad.agenda.configuracion.ConfiguracionService;
+import com.agendad.agenda.configuracion.dto.BloqueoRequest;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -58,6 +61,9 @@ class SeparacionEntreNegociosTest {
     @Autowired
     private AgendaService agendaService;
 
+    @Autowired
+    private ConfiguracionService configuracion;
+
     /**
      * Un segundo negocio no tiene endpoint de alta (no existe en el
      * alcance del proyecto): se inserta directo por SQL, igual que hace
@@ -97,6 +103,44 @@ class SeparacionEntreNegociosTest {
         // debe fallar como "no encontrado", nunca modificar la cita ajena.
         assertThatThrownBy(() -> agendaService.registrarEstado(negocioB, citaDeLaura, "ATENDIDA", null))
                 .isInstanceOf(RecursoNoEncontrado.class);
+    }
+
+    @Test
+    void cancelarUnaCitaDeOtroNegocioNoEncuentraNadaYNoLaToca() {
+        assertThatThrownBy(() -> agendaService.cancelar(negocioB, citaDeLaura, "intento ajeno", null))
+                .isInstanceOf(RecursoNoEncontrado.class);
+        assertThat(jdbc.queryForObject("SELECT estado FROM agenda.cita WHERE id = ?", String.class, citaDeLaura))
+                .isEqualTo("CONFIRMADA");
+    }
+
+    @Test
+    void laConfiguracionDeOtroNegocioNoMuestraNadaDelPrimero() {
+        // negocioB existe pero no tiene servicios ni profesionales: no debe
+        // ver los de la barbería aunque compartan base de datos.
+        var config = configuracion.negocio(negocioB);
+        assertThat(config.servicios()).isEmpty();
+        assertThat(config.profesionales()).isEmpty();
+        assertThat(configuracion.negocio(NEGOCIO_A).profesionales())
+                .extracting(p -> p.id()).contains(PROFESIONAL_LAURA);
+    }
+
+    @Test
+    void noSePuedeBloquearNiConsultarBloqueosDeUnProfesionalAjeno() {
+        var inicio = java.time.Instant.now().plus(30, ChronoUnit.DAYS);
+        assertThatThrownBy(() -> configuracion.crearBloqueo(negocioB,
+                new BloqueoRequest(PROFESIONAL_LAURA, inicio, inicio.plusSeconds(3600), null)))
+                .isInstanceOf(RecursoNoEncontrado.class);
+        assertThatThrownBy(() -> configuracion.bloqueosVigentes(negocioB, PROFESIONAL_LAURA))
+                .isInstanceOf(RecursoNoEncontrado.class);
+    }
+
+    @Test
+    void bloquearUnRangoConUnaCitaConfirmadaEsConflictoContraLaBaseReal() {
+        var inicio = jdbc.queryForObject("SELECT inicio FROM agenda.cita WHERE id = ?",
+                java.sql.Timestamp.class, citaDeLaura).toInstant();
+        assertThatThrownBy(() -> configuracion.crearBloqueo(NEGOCIO_A,
+                new BloqueoRequest(PROFESIONAL_LAURA, inicio.minusSeconds(1800), inicio.plusSeconds(1800), null)))
+                .isInstanceOf(Conflicto.class);
     }
 
     @Test

@@ -9,6 +9,8 @@ import com.agendad.agenda.dominio.Negocio;
 import com.agendad.agenda.dominio.Outbox;
 import com.agendad.agenda.dominio.Profesional;
 import com.agendad.agenda.dominio.Servicio;
+import com.agendad.agenda.outbox.evento.ClienteEvento;
+import com.agendad.agenda.outbox.evento.EventoCitaCancelada;
 import com.agendad.agenda.outbox.evento.EventoCitaEstado;
 import com.agendad.agenda.repositorio.CitaRepository;
 import com.agendad.agenda.repositorio.NegocioRepository;
@@ -25,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AgendaService {
+
+    private static final Logger log = LoggerFactory.getLogger(AgendaService.class);
 
     private static final DateTimeFormatter HORA_LOCAL = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -84,10 +90,71 @@ public class AgendaService {
                 .map(c -> new CitaDetalleResponse(
                         c.getId(), c.getInicio(), c.getFin(),
                         c.getInicio().atZone(zona).toLocalTime().format(HORA_LOCAL),
-                        nombrePorServicio.get(c.getServicioId()), profesional.getNombre(),
+                        c.getServicioId(), nombrePorServicio.get(c.getServicioId()),
+                        c.getProfesionalId(), profesional.getNombre(),
                         c.getClienteNombre(), c.getClienteCelular(),
                         c.getEstado().name()))
                 .toList();
+    }
+
+    /** Una cita del negocio, con el celular completo (lo pide el propio negocio). */
+    @Transactional(readOnly = true)
+    public CitaDetalleResponse detalle(UUID negocioId, UUID citaId) {
+        Cita cita = citaRepo.findByIdAndNegocioId(citaId, negocioId)
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos esa cita en este negocio."));
+        return detalleDe(cita);
+    }
+
+    /**
+     * El negocio cancela una cita: libera el cupo y publica
+     * {@code citas.canceladas} con {@code canceladaPor = NEGOCIO} por outbox,
+     * en la misma transacción. Cancelar una ya cancelada no emite un segundo
+     * evento. El motivo no está en el contrato del evento ni en el esquema:
+     * queda en el log del servicio.
+     */
+    @Transactional
+    public CitaDetalleResponse cancelar(UUID negocioId, UUID citaId, String motivo, String correlationId) {
+        Cita cita = citaRepo.findByIdAndNegocioId(citaId, negocioId)
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos esa cita en este negocio."));
+
+        if (cita.estaCancelada()) {
+            return detalleDe(cita);
+        }
+        if (!cita.estaConfirmada()) {
+            throw new PeticionInvalida("Esa cita ya tiene un resultado registrado; no se puede cancelar.");
+        }
+
+        cita.cancelar();
+        log.info("Cita {} cancelada por el negocio {}. Motivo: {}", cita.getId(), negocioId,
+                motivo == null || motivo.isBlank() ? "(sin motivo)" : motivo);
+
+        EventoCitaCancelada evento = new EventoCitaCancelada(
+                UUID.randomUUID(), EventoCitaCancelada.VERSION_ACTUAL, Instant.now(),
+                correlacion(correlationId),
+                cita.getNegocioId(), cita.getId(), cita.getProfesionalId(), cita.getServicioId(),
+                cita.getInicio(), cita.getFin(),
+                EventoCitaCancelada.POR_NEGOCIO,
+                new ClienteEvento(cita.getClienteNombre(), cita.getClienteCelular()));
+
+        outboxRepo.save(new Outbox("citas.canceladas", cita.getProfesionalId().toString(),
+                cita.getNegocioId(), serializar(evento)));
+        return detalleDe(cita);
+    }
+
+    private CitaDetalleResponse detalleDe(Cita cita) {
+        Negocio negocio = negocioRepo.findById(cita.getNegocioId())
+                .orElseThrow(() -> new RecursoNoEncontrado("No encontramos ese negocio."));
+        ZoneId zona = ZoneId.of(negocio.getZonaHoraria());
+        String servicioNombre = servicioRepo.findById(cita.getServicioId())
+                .map(Servicio::getNombre).orElse(null);
+        String profesionalNombre = profesionalRepo.findById(cita.getProfesionalId())
+                .map(Profesional::getNombre).orElse(null);
+        return new CitaDetalleResponse(
+                cita.getId(), cita.getInicio(), cita.getFin(),
+                cita.getInicio().atZone(zona).toLocalTime().format(HORA_LOCAL),
+                cita.getServicioId(), servicioNombre, cita.getProfesionalId(), profesionalNombre,
+                cita.getClienteNombre(), cita.getClienteCelular(),
+                cita.getEstado().name());
     }
 
     /**
@@ -121,11 +188,11 @@ public class AgendaService {
                 cita.getNegocioId(), serializar(evento)));
     }
 
-    private String serializar(EventoCitaEstado evento) {
+    private String serializar(Object evento) {
         try {
             return objectMapper.writeValueAsString(evento);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("No se pudo serializar el evento citas.estado", e);
+            throw new IllegalStateException("No se pudo serializar el evento " + evento.getClass().getSimpleName(), e);
         }
     }
 
