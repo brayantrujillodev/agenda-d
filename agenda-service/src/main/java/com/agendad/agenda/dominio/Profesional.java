@@ -27,6 +27,13 @@ public class Profesional {
     protected Profesional() {
     }
 
+    /** Profesional nuevo del negocio. Nace activo y sin horario. */
+    public Profesional(UUID negocioId, String nombre) {
+        this.negocioId = negocioId;
+        this.nombre = nombre;
+        this.activo = true;
+    }
+
     public UUID getId() {
         return id;
     }

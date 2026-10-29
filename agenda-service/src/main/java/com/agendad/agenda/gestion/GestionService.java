@@ -75,7 +75,7 @@ public class GestionService {
         return new CitaDetalleResponse(
                 cita.getId(), cita.getInicio(), cita.getFin(),
                 cita.getInicio().atZone(zona).toLocalTime().format(HORA_LOCAL),
-                servicioNombre, profesionalNombre,
+                cita.getServicioId(), servicioNombre, cita.getProfesionalId(), profesionalNombre,
                 cita.getClienteNombre(), mascararCelular(cita.getClienteCelular()),
                 cita.getEstado().name());
     }

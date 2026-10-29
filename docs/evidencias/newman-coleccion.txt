@@ -1,0 +1,261 @@
+(node:26064) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+AGENDA-D
+
+□ 1. Público · reserva (agenda-service)
+└ Servicios del negocio
+  GET http://localhost:8081/v1/publico/barberia-el-corte/servicios [200 OK, 461B, 46ms]
+  √  200 con servicios
+
+└ Disponibilidad (toma el primer cupo libre)
+  GET http://localhost:8081/v1/publico/barberia-el-corte/disponibilidad?servicioId=22222222-2222-2222-2222-222222222222&fecha=2026-10-29&profesionalId=33333333-3333-3333-3333-333333333333 [200 OK, 1.81kB, 23ms]
+  √  200
+  √  hay al menos un cupo libre
+
+└ Reservar cita (201)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [201 Created, 570B, 31ms]
+  √  201 cita confirmada
+
+└ Reenviar la MISMA Idempotency-Key (no crea otra)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [201 Created, 570B, 16ms]
+  √  devuelve la cita original
+
+└ Mismo cupo con otra clave → 409 + alternativas
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [409 Conflict, 1.2kB, 33ms]
+  √  409 CUPO_OCUPADO
+  √  trae alternativas
+
+□ 2. Validaciones · datos del cliente (todas deben dar 400)
+└ Nombre con HTML/script
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 8ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: solo con letras
+
+└ Nombre con símbolos
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 10ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: solo con letras
+
+└ Nombre de una sola palabra
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 11ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: nombre y apellido
+
+└ Nombre con números
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 11ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: solo con letras
+
+└ Nombre de más de 80 caracteres
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 319B, 10ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: entre 5 y 80
+
+└ Celular 0000000000
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 9ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: empezar por 3
+
+└ Celular con +57
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 15ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: empezar por 3
+
+└ Celular de 9 dígitos
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 15ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: empezar por 3
+
+└ Celular enviado como número
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 334B, 13ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: clienteCelular
+
+└ Campo que no está en el contrato
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 324B, 9ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: no se permite
+
+└ Hora ya pasada
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 328B, 22ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: ya pasó
+
+└ Fuera de la grilla (10:17)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 380B, 28ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: no es un cupo
+
+└ Madrugada (03:00 Bogotá)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 380B, 26ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: no es un cupo
+
+└ Más de 60 días adelante
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 333B, 24ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: 60 días
+
+└ Fecha con formato inválido
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 326B, 10ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: inicio
+
+└ Idempotency-Key que no es UUID
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 319B, 13ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: UUID
+
+└ Sin Idempotency-Key
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 308B, 9ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: Idempotency-Key
+
+└ Disponibilidad de una fecha pasada
+  GET http://localhost:8081/v1/publico/barberia-el-corte/disponibilidad?servicioId=22222222-2222-2222-2222-222222222222&fecha=2026-01-05 [400 Bad Request, 332B, 14ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: ya pasó
+
+□ 3. Administración · negocio (X-Negocio-Id)
+└ Agenda del día del profesional
+  GET http://localhost:8081/v1/agenda/33333333-3333-3333-3333-333333333333?fecha=2026-10-29 [200 OK, 1.01kB, 37ms]
+  √  200
+
+└ Registrar resultado de la cita (ATENDIDA)
+  PATCH http://localhost:8081/v1/citas/676d631c-b821-4da9-9d83-88f790ae86ba/estado [204 No Content, 201B, 17ms]
+  √  204
+
+└ Sin X-Negocio-Id → 400
+  GET http://localhost:8081/v1/agenda/33333333-3333-3333-3333-333333333333?fecha=2026-10-29 [400 Bad Request, 305B, 6ms]
+  √  400 DATOS_INVALIDOS
+  √  mensaje: X-Negocio-Id
+
+□ 4. Gestión · el cliente opera su cita (token)
+└ Consultar mi cita
+  GET http://localhost:8081/v1/gestion/6cf710556d7a82c6991d0c535871c4f22be4a1cdbb873c34 [200 OK, 630B, 18ms]
+  √  200
+
+└ Cancelar mi cita
+  DELETE http://localhost:8081/v1/gestion/6cf710556d7a82c6991d0c535871c4f22be4a1cdbb873c34?confirmar=true [400 Bad Request, 319B, 13ms]
+  √  204 o 400 si ya tiene resultado
+
+□ 5. Gateway GraphQL
+└ panelRecepcion (pantalla completa en una consulta)
+  POST http://localhost:8080/graphql [200 OK, 837B, 227ms]
+  √  200 sin errores GraphQL
+
+└ negocio (configuración desde agenda-service)
+  POST http://localhost:8080/graphql [200 OK, 2.41kB, 29ms]
+  √  200 sin errores GraphQL
+  √  los datos vienen de agenda-service
+
+└ agenda(profesionalId, fecha)
+  POST http://localhost:8080/graphql [200 OK, 648B, 35ms]
+  √  200 sin errores GraphQL
+
+└ metricas(desde, hasta) con topServicios nombrados
+  POST http://localhost:8080/graphql [200 OK, 448B, 33ms]
+  √  200 sin errores GraphQL
+
+└ crearServicio
+  POST http://localhost:8080/graphql [200 OK, 401B, 21ms]
+  √  200 sin errores GraphQL
+
+└ actualizarServicio
+  POST http://localhost:8080/graphql [200 OK, 383B, 23ms]
+  √  200 sin errores GraphQL
+  √  precio con 2 decimales
+
+└ crearProfesional
+  POST http://localhost:8080/graphql [200 OK, 439B, 41ms]
+  √  200 sin errores GraphQL
+
+└ definirHorario
+  POST http://localhost:8080/graphql [200 OK, 423B, 41ms]
+  √  200 sin errores GraphQL
+  √  2 franjas
+
+└ crearBloqueo (rango libre, 40 días adelante)
+  POST http://localhost:8080/graphql [200 OK, 410B, 25ms]
+  √  200 sin errores GraphQL
+
+└ bloqueos(profesionalId)
+  POST http://localhost:8080/graphql [200 OK, 408B, 16ms]
+  √  200 sin errores GraphQL
+  √  incluye el bloqueo recién creado
+
+└ cancelarCita (la de la carpeta 1)
+  POST http://localhost:8080/graphql [200 OK, 489B, 20ms]
+  √  cancelada, o rechazada por tener ya un resultado
+
+└ registrarAsistencia con estado no permitido
+  POST http://localhost:8080/graphql [200 OK, 478B, 8ms]
+  √  error DATOS_INVALIDOS en formato GraphQL
+
+└ desactivarServicio
+  POST http://localhost:8080/graphql [200 OK, 289B, 19ms]
+  √  200 sin errores GraphQL
+  √  true
+
+└ ERROR · sin cabecera X-Negocio-Id
+  POST http://localhost:8080/graphql [200 OK, 484B, 7ms]
+  √  error DATOS_INVALIDOS en formato GraphQL
+
+└ ERROR · negocio inexistente
+  POST http://localhost:8080/graphql [200 OK, 443B, 14ms]
+  √  error NO_ENCONTRADO en formato GraphQL
+
+└ ERROR · input inválido (se rechaza en el gateway)
+  POST http://localhost:8080/graphql [200 OK, 463B, 8ms]
+  √  error DATOS_INVALIDOS en formato GraphQL
+
+└ ERROR · consulta demasiado profunda
+  POST http://localhost:8080/graphql [200 OK, 402B, 8ms]
+  √  se corta por profundidad
+
+□ 6. Analítica
+└ Métricas del periodo
+  GET http://localhost:8083/v1/metricas?desde=2026-09-01&hasta=2026-12-31 [200 OK, 390B, 12ms]
+  √  200
+
+□ 7. Notificaciones
+└ Mensajes fallidos (citas.dlq)
+  GET http://localhost:8082/v1/mensajes-fallidos [200 OK, 255B, 20ms]
+  √  200
+
+□ 8. Salud de los servicios
+└ agenda-service
+  GET http://localhost:8081/actuator/health [200 OK, 241B, 12ms]
+  √  UP
+
+└ notificaciones-service
+  GET http://localhost:8082/actuator/health [200 OK, 207B, 11ms]
+  √  UP
+
+└ analitica-service
+  GET http://localhost:8083/actuator/health [200 OK, 207B, 8ms]
+  √  UP
+
+└ gateway-graphql
+  GET http://localhost:8080/actuator/health [200 OK, 207B, 5ms]
+  √  UP
+
+┌─────────────────────────┬───────────────────┬──────────────────┐
+│                         │          executed │           failed │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              iterations │                 1 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│                requests │                51 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│            test-scripts │                51 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│      prerequest-scripts │                 3 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              assertions │                77 │                0 │
+├─────────────────────────┴───────────────────┴──────────────────┤
+│ total run duration: 5.3s                                       │
+├────────────────────────────────────────────────────────────────┤
+│ total data received: 12.41kB (approx)                          │
+├────────────────────────────────────────────────────────────────┤
+│ average response time: 22ms [min: 5ms, max: 227ms, s.d.: 30ms] │
+└────────────────────────────────────────────────────────────────┘

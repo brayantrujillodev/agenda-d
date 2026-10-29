@@ -112,11 +112,14 @@ services:
     environment:
       AGENDAD_AGENDA_URL: http://agenda-service:8081
       AGENDAD_ANALITICA_URL: http://analitica-service:8083
+      # Perfil prod: sin introspección ni GraphiQL (application-prod.yml).
+      SPRING_PROFILES_ACTIVE: prod
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
       - "8080:8080"
     depends_on:
       agenda-service: { condition: service_healthy }
+      analitica-service: { condition: service_started }
     mem_limit: 512m
     networks: [agenda-net]
 

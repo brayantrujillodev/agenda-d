@@ -28,6 +28,10 @@ window.CONFIG = {
   // Solo para pintar el encabezado antes de que carguen los servicios.
   negocioNombre: 'Barbería El Corte',
 
+  // Negocio del panel de recepción. Va en la cabecera X-Negocio-Id de cada
+  // consulta al gateway (no hay login: CLAUDE.md, regla 4). Es el de la semilla.
+  negocioId: '11111111-1111-1111-1111-111111111111',
+
   // Gateway GraphQL (panel.html, panel de recepción — docs/TAREAS.md #20).
   // CLAUDE.md expone gateway-graphql en :8080.
   gatewayUrl: 'http://localhost:8080/graphql',

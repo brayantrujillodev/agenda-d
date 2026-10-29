@@ -6,7 +6,7 @@
  * conexión y no hay cola de reservas offline (dos personas reservando el mismo
  * cupo sin red generan un conflicto irresoluble al sincronizar).
  */
-const CACHE = 'agenda-d-pwa-v4';
+const CACHE = 'agenda-d-pwa-v5';
 
 const APP_SHELL = [
   './',

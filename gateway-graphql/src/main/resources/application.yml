@@ -2,12 +2,21 @@ spring:
   application:
     name: gateway-graphql
   graphql:
-    graphiql:
-      enabled: true
     path: /graphql
+    graphiql:
+      # Explorador interactivo para desarrollo. Se apaga en el perfil prod
+      # (application-prod.yml) junto con la introspección.
+      enabled: true
+    schema:
+      introspection:
+        enabled: true
 
 server:
   port: 8080
+  error:
+    # Nunca un stacktrace ni el mensaje de una excepción hacia el cliente.
+    include-stacktrace: never
+    include-message: never
 
 management:
   endpoints:
@@ -16,6 +25,22 @@ management:
         include: health,info
 
 agendad:
+  servicios:
+    agenda-url: ${AGENDAD_AGENDA_URL:http://localhost:8081}
+    analitica-url: ${AGENDAD_ANALITICA_URL:http://localhost:8083}
+  http:
+    # Un servicio colgado no puede colgar el panel: se corta y se informa
+    # SERVICIO_NO_DISPONIBLE en errors[].
+    timeout-conexion-ms: ${AGENDAD_HTTP_TIMEOUT_CONEXION_MS:2000}
+    timeout-lectura-ms: ${AGENDAD_HTTP_TIMEOUT_LECTURA_MS:5000}
+  graphql:
+    # Profundidad: la consulta de introspección de GraphiQL tiene que pasar;
+    # los anidamientos abusivos (profesional > agenda > profesional > ...) no.
+    profundidad-maxima: ${AGENDAD_GRAPHQL_PROFUNDIDAD_MAXIMA:15}
+    complejidad-maxima: ${AGENDAD_GRAPHQL_COMPLEJIDAD_MAXIMA:300}
+  limite:
+    # Rate limiting básico por IP sobre /graphql (LimitePeticionesFilter).
+    peticiones-por-minuto: ${AGENDAD_LIMITE_PETICIONES_POR_MINUTO:120}
   cors:
     # El panel de recepción (web/panel.html, docs/TAREAS.md #20) llama a
     # /graphql por fetch() desde un origen distinto. Si se accede por

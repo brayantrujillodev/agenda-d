@@ -17,6 +17,25 @@
 #   para el panel administrativo. Van directo a agenda-service por REST.
 #   GraphQL sirve al panel de recepción, que es donde una sola pantalla
 #   necesita datos de varios servicios a la vez.
+#
+# CONTEXTO DE NEGOCIO
+#   Toda operación exige la cabecera HTTP `X-Negocio-Id` (UUID). El
+#   gateway la reenvía tal cual a agenda-service y analitica-service, que
+#   filtran por ella. No hay autenticación (acuerdo con el docente).
+#
+# ERRORES
+#   Formato estándar de GraphQL: `errors[]` con `message` en español y
+#   `extensions.codigo` (el mismo `codigo` que devuelve el servicio
+#   interno, p. ej. NO_ENCONTRADO, DATOS_INVALIDOS, CITAS_EN_RANGO) y
+#   `extensions.classification` (BAD_REQUEST, NOT_FOUND, INTERNAL_ERROR).
+#   Nunca un stacktrace. Si analitica-service no responde, el panel sale
+#   igual: `metricasDelMes` llega en null con su error en `errors[]`.
+#
+# LÍMITES
+#   Profundidad máxima y complejidad máxima por consulta, y un tope de
+#   peticiones por minuto por cliente (ver gateway-graphql/application.yml).
+#   El gateway valida la FORMA de las entradas (longitudes, rangos); las
+#   reglas del dominio las sigue validando agenda-service.
 # =====================================================================
 
 scalar Instant   # ISO-8601 en UTC. Ej: "2026-08-20T13:00:00Z"
@@ -121,7 +140,11 @@ type PanelRecepcion {
   fecha: Date!
   negocio: Negocio!
   citasDelDia: [Cita!]!
-  metricasDelMes: Metricas!
+  """
+  Admite null a propósito: si analitica-service no responde, la agenda del
+  día se muestra igual y el motivo llega en `errors[]`.
+  """
+  metricasDelMes: Metricas
 }
 
 # ---------------------------------------------------------------------

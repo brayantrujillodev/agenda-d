@@ -106,7 +106,7 @@ services:
   # Consola para ver tópicos, particiones y retrasos de consumo.
   # Útil para la sustentación.
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:v0.7.2
     container_name: agd-kafka-ui
     profiles: [infra, full]
     environment:
@@ -211,7 +211,17 @@ services:
     ports:
       - "8080:8080"          # el panel de recepción consume esto
     depends_on:
+      # Si arrancara antes que analitica, metricasDelMes saldría en null con
+      # SERVICIO_NO_DISPONIBLE en errors[] (no con ceros falsos), pero mejor
+      # que el panel abra completo desde el primer intento.
       agenda-service: { condition: service_healthy }
+      analitica-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     mem_limit: 512m
     networks: [agenda-net]
 
@@ -231,6 +241,12 @@ services:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       kafka-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     mem_limit: 512m
     networks: [agenda-net]
 
