@@ -32,8 +32,8 @@ Resultados medibles de la verificación final (sección 8):
 |---|---|
 | Verificaciones del flujo completo contra el stack real | **31 de 31** |
 | Colección de Postman corrida con Newman | **51 peticiones, 77 aserciones, 0 fallos** |
-| Pruebas automatizadas (JUnit) | **115**, 0 fallos en el último reporte registrado |
-| Prueba de concurrencia: 100 hilos sobre el mismo cupo | 1 éxito y 99 conflictos, en verde en el CI de GitHub |
+| Pruebas automatizadas (JUnit, `mvn verify`) | **115 de 115** en los cuatro servicios |
+| Prueba de concurrencia: 100 hilos sobre el mismo cupo | 1 éxito y 99 conflictos (Testcontainers 1.21.4, Postgres real) |
 | Servicios sanos con `docker compose --profile full up -d --build` | 4 de 4 (`/actuator/health` = 200) |
 | Errores y advertencias en el log de un arranque limpio | 0 |
 
@@ -317,18 +317,21 @@ Duración total 5,8 s; tiempo medio de respuesta 34 ms (mínimo 7 ms, máximo 18
 
 **Prueba de concurrencia** (`ReservaConcurrenciaTest`, obligatoria): 100 hilos
 reales contra un Postgres real intentan reservar el mismo cupo; el resultado
-esperado y obtenido en el CI de GitHub (Linux) es **1 éxito y 99 conflictos**
+esperado y obtenido es **1 éxito y 99 conflictos**
 por `cita_sin_solape`. **Prueba de separación entre negocios**
 (`SeparacionEntreNegociosTest`): 7 casos contra Postgres real.
 
-**Nota honesta sobre el entorno local.** En la máquina de desarrollo
-(Windows con Docker Desktop 29) las dos pruebas que usan Testcontainers 1.20.4
-no pueden iniciar: Testcontainers recibe un `400` vacío del daemon al
-consultar `/info`. Es una incompatibilidad entre esa versión y Docker Desktop,
-ajena al código, y ya figuraba en el README. Por eso esas pruebas se
-verifican en el **CI de GitHub Actions** (workflow `build`, en verde en
-`feat/gateway-graphql-p3`). Mejora propuesta: subir Testcontainers a una
-versión compatible con Docker Desktop reciente.
+**Hallazgo del 2026-11-18: Testcontainers 1.20.4 ya no funciona con Docker 29.**
+Las dos pruebas que usan Testcontainers (concurrencia y separación entre
+negocios) fallaban con `Could not find a valid Docker environment` tanto en la
+máquina de desarrollo como en el CI de GitHub, porque Docker 29 exige una
+versión mínima de API (1.40 o superior) que el cliente de 1.20.4 no
+negocia. El código no tenía ningún defecto. Se subió Testcontainers a
+**1.21.4** en `agenda-service/pom.xml` y las pruebas pasan: concurrencia
+1/1 (1 éxito, 99 conflictos) y separación entre negocios 7/7. La corrida
+completa de `mvn verify` en los cuatro servicios está en
+[`docs/evidencias/pruebas-maven.txt`](evidencias/pruebas-maven.txt):
+69 + 7 + 9 + 30 = **115 pruebas, 0 fallos, `BUILD SUCCESS` en los cuatro**.
 
 ### 8.5 Calidad de los logs
 
@@ -361,6 +364,7 @@ esta entrega `markdownlint` (11 archivos) y `yamllint` quedaron en 0 errores y
 | `v1.0.1` devolvía datos de ejemplo en `panelRecepcion` aunque el backend respondiera | Verificación a mano | Corregido en `v1.0.2`; el tag viejo se deja por trazabilidad |
 | El gateway inventaba datos si un servicio caía; negocio y profesional fijos en código | Auditoría de P3 | Errores GraphQL `SERVICIO_NO_DISPONIBLE`, negocio leído de `GET /v1/negocio` |
 | Dos servicios mapeaban el puerto equivocado en el Compose | Revisión del arranque | Puertos corregidos y healthchecks |
+| Testcontainers 1.20.4 incompatible con Docker 29: las 2 pruebas con contenedores fallaban en local y en el CI | `mvn verify` en el PR #37 | Subir a 1.21.4; 115/115 |
 | 130 conexiones simultáneas desde el script de evidencia provocaban `ECONNRESET` en Windows | Regeneración de evidencia | Envío en serie en `flujo-p3.mjs` |
 
 ## 10. Resultados frente a los objetivos
@@ -409,8 +413,6 @@ apagado; su costo mensual dependería del proveedor elegido.
 - **`analitica-service` sin imagen propia** en GHCR (es posterior al tag
   `v1.0.2`).
 - **Ocupación aproximada**: usa una jornada configurable, no el horario real.
-- **Testcontainers 1.20.4** no arranca contra Docker Desktop 29 en local;
-  se verifica en CI. Actualizar la dependencia lo resolvería.
 - **Canales de notificación**: hoy el aviso se registra en la base de datos (adaptador `RegistroCanal`, sin costo); un
   canal real (SMS, WhatsApp o correo) sería el siguiente paso.
 
