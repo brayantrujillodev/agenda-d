@@ -5,6 +5,8 @@ Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
 
 **Brayan Trujillo · Andrés Bonilla · Johan Camacho · Luis Moncada**
 
+**Repositorio:** <https://github.com/brayantrujillodev/agenda-d> · **Informe final:** [`docs/INFORME-FINAL.md`](docs/INFORME-FINAL.md)
+
 ---
 
 ## Qué hace
