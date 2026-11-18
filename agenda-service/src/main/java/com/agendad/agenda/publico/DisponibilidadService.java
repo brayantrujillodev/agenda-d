@@ -137,7 +137,7 @@ public class DisponibilidadService {
                 Instant inicio = inicioZdt.toInstant();
                 Instant fin = inicioZdt.plusMinutes(duracion).toInstant();
 
-                if (!vistos.add(profesionalId + "@" + inicio)) {
+                if (!validadorCupo.esFuturo(inicio) || !vistos.add(profesionalId + "@" + inicio)) {
                     continue;
                 }
                 if (libre(profesionalId, inicio, fin, bloqueos, ocupadas)) {

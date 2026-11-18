@@ -103,8 +103,8 @@
   const RE_CELULAR = /^3[0-9]{9}$/;
   const DIAS_MAXIMOS_RESERVA = 60;   // agendad.reserva.dias-maximos en agenda-service
 
-  const limpiarNombre = (t) => t.normalize('NFC').trim().replace(/s+/g, ' ');
-  const limpiarCelular = (t) => t.replace(/[s-]/g, '');
+  const limpiarNombre = (t) => t.normalize('NFC').trim().replace(/\s+/g, ' ');
+  const limpiarCelular = (t) => t.replace(/[\s-]/g, '');
 
   const dinero = (n) => '$' + Number(n).toLocaleString('es-CO');
 

@@ -32,7 +32,7 @@ Resultados medibles de la verificación final (sección 8):
 |---|---|
 | Verificaciones del flujo completo contra el stack real | **31 de 31** |
 | Colección de Postman corrida con Newman | **51 peticiones, 77 aserciones, 0 fallos** |
-| Pruebas automatizadas (JUnit, `mvn verify`) | **115 de 115** en los cuatro servicios |
+| Pruebas automatizadas (JUnit, `mvn verify`) | **116 de 116** en los cuatro servicios |
 | Prueba de concurrencia: 100 hilos sobre el mismo cupo | 1 éxito y 99 conflictos (Testcontainers 1.21.4, Postgres real) |
 | Servicios sanos con `docker compose --profile full up -d --build` | 4 de 4 (`/actuator/health` = 200) |
 | Errores y advertencias en el log de un arranque limpio | 0 |
@@ -177,7 +177,7 @@ así la cancelación nunca se procesa antes que la reserva que la origina.
 
 | Componente | Puerto | Responsabilidad | Líneas de código (main) | Pruebas |
 |---|---|---|---|---|
-| `agenda-service` | 8081 | Dominio: servicios, profesionales, horarios, bloqueos, disponibilidad, reserva, gestión por token, outbox | 3 201 | 69 |
+| `agenda-service` | 8081 | Dominio: servicios, profesionales, horarios, bloqueos, disponibilidad, reserva, gestión por token, outbox | 3 201 | 70 |
 | `notificaciones-service` | 8082 | Consume eventos, confirma, cancela, programa y envía el recordatorio, DLQ | 974 | 7 |
 | `analitica-service` | 8083 | Consume eventos, ocupación e inasistencia, `topServicios` | 659 | 9 |
 | `gateway-graphql` | 8080 | Compone el panel; 5 queries y 8 mutaciones; límites y errores GraphQL | 1 479 | 30 |
@@ -304,13 +304,13 @@ Corrida con Newman el 2026-11-18. Salida completa en
 | Scripts de prueba | 51 | 0 |
 | Aserciones | 77 | 0 |
 
-Duración total 5,8 s; tiempo medio de respuesta 34 ms (mínimo 7 ms, máximo 185 ms).
+Duración total 5 s; tiempo medio de respuesta 19 ms (mínimo 5 ms, máximo 138 ms).
 
-### 8.4 Pruebas automatizadas: 115
+### 8.4 Pruebas automatizadas: 116
 
 | Servicio | Pruebas | Qué cubren |
 |---|---|---|
-| `agenda-service` | 69 | Administración, configuración, gestión, outbox, disponibilidad, validación de reserva, reserva, validador de cupo, **concurrencia** y **separación entre negocios** |
+| `agenda-service` | 70 | Administración, configuración, gestión, outbox, disponibilidad, validación de reserva, reserva, validador de cupo, **concurrencia** y **separación entre negocios** |
 | `notificaciones-service` | 7 | Consumo con deduplicación, reintentos, recordatorio |
 | `analitica-service` | 9 | Consumo y proyección, controlador de métricas |
 | `gateway-graphql` | 30 | Cliente HTTP (regresión de `PATCH`), límite de peticiones, contrato GraphQL |
@@ -331,7 +331,7 @@ negocia. El código no tenía ningún defecto. Se subió Testcontainers a
 1/1 (1 éxito, 99 conflictos) y separación entre negocios 7/7. La corrida
 completa de `mvn verify` en los cuatro servicios está en
 [`docs/evidencias/pruebas-maven.txt`](evidencias/pruebas-maven.txt):
-69 + 7 + 9 + 30 = **115 pruebas, 0 fallos, `BUILD SUCCESS` en los cuatro**.
+70 + 7 + 9 + 30 = **116 pruebas, 0 fallos, `BUILD SUCCESS` en los cuatro**.
 
 ### 8.5 Calidad de los logs
 
@@ -353,6 +353,71 @@ manual y desconexiones al suspender Docker Desktop), no fallos del sistema.
 esta entrega `markdownlint` (11 archivos) y `yamllint` quedaron en 0 errores y
 0 advertencias; `.postman/` se excluye de `yamllint` por ser generado.
 
+### 8.7 Capturas de pantalla
+
+Tomadas el 2026-11-18 en un navegador real contra el stack levantado con
+`docker compose --profile full up -d --build`. Están en
+[`docs/evidencias/capturas/`](evidencias/capturas/).
+
+**1 · Reserva pública: el cliente elige el servicio.** La PWA lee el catálogo
+real de `agenda-service`.
+
+![Selección de servicio en la PWA](evidencias/capturas/01-pwa-servicios.jpg)
+
+**2 · Cupos libres del día.** Solo aparecen horas futuras; cada botón es un
+profesional con una franja libre.
+
+![Cupos disponibles](evidencias/capturas/02-pwa-cupos-futuros.jpg)
+
+**3 · Datos del cliente.** Sin cuenta ni contraseña: nombre y celular.
+
+![Formulario de datos](evidencias/capturas/03-pwa-datos-cliente.jpg)
+
+**4 · Cita confirmada.** Estado `CONFIRMADA` y enlace de gestión para
+consultar o cancelar sin iniciar sesión.
+
+![Cita confirmada](evidencias/capturas/04-pwa-cita-confirmada.jpg)
+
+**5 · Panel de recepción.** La cita recién reservada aparece en la agenda del
+día y en los indicadores del mes: el circuito reserva, outbox, Kafka,
+analítica y GraphQL funcionando de extremo a extremo.
+
+![Panel de recepción](evidencias/capturas/05-panel-recepcion.jpg)
+
+**6 · Swagger de `agenda-service`.** Documentación interactiva de la API REST.
+
+![Swagger](evidencias/capturas/06-swagger-agenda-service.jpg)
+
+**7 · Consola de Kafka.** Los tópicos `citas.reservadas`, `citas.canceladas`,
+`citas.estado` y la cola `citas.dlq` (con 0 mensajes), con 3 particiones cada
+uno.
+
+![Tópicos de Kafka](evidencias/capturas/07-kafka-topicos.jpg)
+
+**8 · Defecto encontrado y corregido.** Antes del arreglo, el formulario
+rechazaba «Carlos Ramirez» por una expresión regular mal escrita (sección 9).
+
+![Defecto de validación del nombre](evidencias/capturas/08-defecto-validacion-nombre-antes-del-arreglo.jpg)
+
+**Estado de los contenedores y de la base de datos.** El texto completo está
+en [`docs/evidencias/estado-contenedores-y-bd.txt`](evidencias/estado-contenedores-y-bd.txt):
+8 contenedores arriba, la restricción `cita_sin_solape` tal como la guarda
+PostgreSQL, las 15 tablas de los tres esquemas y el outbox con todos sus
+eventos publicados (13 enviados, 0 pendientes).
+
+```text
+cita_sin_solape | EXCLUDE USING gist (profesional_id WITH =,
+                  tstzrange(inicio, fin, '[)') WITH &&)
+                  WHERE ((estado <> 'CANCELADA'))
+```
+
+No hay captura de GraphiQL: la página que incluye Spring carga sus scripts
+desde `unpkg.com`, que durante la prueba respondió 503. La evidencia de
+GraphQL está en texto, con cada petición y respuesta, en
+[`P3-ENTREGA-1.md`](evidencias/P3-ENTREGA-1.md) y en las 51 peticiones de
+Newman. Tampoco hay captura de pgAdmin: su ventana quedó demasiado angosta
+para ser legible, y la consulta equivalente está en el archivo de texto.
+
 ## 9. Errores reales encontrados al probar contra infraestructura real
 
 | Hallazgo | Cómo apareció | Corrección |
@@ -364,8 +429,10 @@ esta entrega `markdownlint` (11 archivos) y `yamllint` quedaron en 0 errores y
 | `v1.0.1` devolvía datos de ejemplo en `panelRecepcion` aunque el backend respondiera | Verificación a mano | Corregido en `v1.0.2`; el tag viejo se deja por trazabilidad |
 | El gateway inventaba datos si un servicio caía; negocio y profesional fijos en código | Auditoría de P3 | Errores GraphQL `SERVICIO_NO_DISPONIBLE`, negocio leído de `GET /v1/negocio` |
 | Dos servicios mapeaban el puerto equivocado en el Compose | Revisión del arranque | Puertos corregidos y healthchecks |
-| Testcontainers 1.20.4 incompatible con Docker 29: las 2 pruebas con contenedores fallaban en local y en el CI | `mvn verify` en el PR #37 | Subir a 1.21.4; 115/115 |
+| Testcontainers 1.20.4 incompatible con Docker 29: las 2 pruebas con contenedores fallaban en local y en el CI | `mvn verify` en el PR #37 | Subir a 1.21.4; 116/116 |
 | 130 conexiones simultáneas desde el script de evidencia provocaban `ECONNRESET` en Windows | Regeneración de evidencia | Envío en serie en `flujo-p3.mjs` |
+| El formulario de la PWA rechazaba cualquier nombre con la letra «s» (Carlos, Luis, Andrés): `replace(/s+/g, " ")` sin la barra invertida convertía cada «s» en un espacio | Captura de la PWA al reservar en el navegador (`08-defecto-validacion-nombre-antes-del-arreglo.jpg`) | `/s+/g` y `/[s-]/g` en `web/app.js` y `web/mock.js`; versión de caché del service worker subida a v6 |
+| `GET /disponibilidad` ofrecía las horas de hoy que ya habían pasado y la reserva las rechazaba con «Esa hora ya pasó» | Reserva en el navegador a las 14:00 con cupos de las 08:00 | `ValidadorCupo.esFuturo` y filtro en `DisponibilidadService`; prueba nueva (70 en `agenda-service`) |
 
 ## 10. Resultados frente a los objetivos
 
@@ -413,6 +480,8 @@ apagado; su costo mensual dependería del proveedor elegido.
 - **`analitica-service` sin imagen propia** en GHCR (es posterior al tag
   `v1.0.2`).
 - **Ocupación aproximada**: usa una jornada configurable, no el horario real.
+- **GraphiQL depende de un CDN**: la página de Spring carga sus scripts desde `unpkg.com`; sin internet o con el CDN caído no abre (el endpoint `/graphql` sigue funcionando).
+- **Límite de peticiones**: el gateway admite 120 por minuto por IP; si se corren seguidas la evidencia de flujo y Newman hay que esperar un minuto entre una y otra.
 - **Canales de notificación**: hoy el aviso se registra en la base de datos (adaptador `RegistroCanal`, sin costo); un
   canal real (SMS, WhatsApp o correo) sería el siguiente paso.
 

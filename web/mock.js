@@ -216,7 +216,7 @@
       const b = opciones.body || {};
       // Mismas reglas que ReservaRequest en agenda-service.
       const P = "[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*";
-      const nombre = (b.clienteNombre || '').trim().replace(/s+/g, ' ');
+      const nombre = (b.clienteNombre || '').trim().replace(/\s+/g, ' ');
       if (nombre.length < 5 || nombre.length > 80 || !new RegExp('^' + P + '(?: ' + P + '){1,5}$').test(nombre)) {
         return err(400, 'DATOS_INVALIDOS', 'Escribe tu nombre y apellido solo con letras, sin números ni símbolos.');
       }

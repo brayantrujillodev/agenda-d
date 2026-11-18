@@ -54,6 +54,13 @@ class ValidadorCupoTest {
     }
 
     @Test
+    void esFuturo_soloParaInstantesPosterioresAlReloj() {
+        org.assertj.core.api.Assertions.assertThat(validador.esFuturo(bogota("2026-09-01T06:00"))).isFalse();
+        org.assertj.core.api.Assertions.assertThat(validador.esFuturo(bogota("2026-09-01T07:00"))).isFalse();
+        org.assertj.core.api.Assertions.assertThat(validador.esFuturo(bogota("2026-09-01T08:00"))).isTrue();
+    }
+
+    @Test
     void cupoDeLaGrilla_pasa() {
         assertThatCode(() -> validador.validarCupo(LAURA, bogota("2026-09-01T10:00"), 60, BOGOTA))
                 .doesNotThrowAnyException();
