@@ -1,261 +1,263 @@
-(node:26064) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(node:15332) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
 (Use `node --trace-deprecation ...` to show where the warning was created)
+newman
+
 AGENDA-D
 
-□ 1. Público · reserva (agenda-service)
-└ Servicios del negocio
-  GET http://localhost:8081/v1/publico/barberia-el-corte/servicios [200 OK, 461B, 46ms]
-  √  200 con servicios
+Folder 1. Público · reserva (agenda-service)
+Sub-folder Servicios del negocio
+  GET http://localhost:8081/v1/publico/barberia-el-corte/servicios [200 OK, 461B, 104ms]
+  Pass  200 con servicios
 
-└ Disponibilidad (toma el primer cupo libre)
-  GET http://localhost:8081/v1/publico/barberia-el-corte/disponibilidad?servicioId=22222222-2222-2222-2222-222222222222&fecha=2026-10-29&profesionalId=33333333-3333-3333-3333-333333333333 [200 OK, 1.81kB, 23ms]
-  √  200
-  √  hay al menos un cupo libre
+Sub-folder Disponibilidad (toma el primer cupo libre)
+  GET http://localhost:8081/v1/publico/barberia-el-corte/disponibilidad?servicioId=22222222-2222-2222-2222-222222222222&fecha=2026-11-19&profesionalId=33333333-3333-3333-3333-333333333333 [200 OK, 1.98kB, 31ms]
+  Pass  200
+  Pass  hay al menos un cupo libre
 
-└ Reservar cita (201)
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [201 Created, 570B, 31ms]
-  √  201 cita confirmada
+Sub-folder Reservar cita (201)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [201 Created, 570B, 42ms]
+  Pass  201 cita confirmada
 
-└ Reenviar la MISMA Idempotency-Key (no crea otra)
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [201 Created, 570B, 16ms]
-  √  devuelve la cita original
+Sub-folder Reenviar la MISMA Idempotency-Key (no crea otra)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [201 Created, 570B, 32ms]
+  Pass  devuelve la cita original
 
-└ Mismo cupo con otra clave → 409 + alternativas
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [409 Conflict, 1.2kB, 33ms]
-  √  409 CUPO_OCUPADO
-  √  trae alternativas
+Sub-folder Mismo cupo con otra clave → 409 + alternativas
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [409 Conflict, 1.2kB, 99ms]
+  Pass  409 CUPO_OCUPADO
+  Pass  trae alternativas
 
-□ 2. Validaciones · datos del cliente (todas deben dar 400)
-└ Nombre con HTML/script
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 8ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: solo con letras
+Folder 2. Validaciones · datos del cliente (todas deben dar 400)
+Sub-folder Nombre con HTML/script
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 26ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: solo con letras
 
-└ Nombre con símbolos
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 10ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: solo con letras
+Sub-folder Nombre con símbolos
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 15ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: solo con letras
 
-└ Nombre de una sola palabra
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 11ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: nombre y apellido
+Sub-folder Nombre de una sola palabra
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 16ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: nombre y apellido
 
-└ Nombre con números
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 11ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: solo con letras
+Sub-folder Nombre con números
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 346B, 17ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: solo con letras
 
-└ Nombre de más de 80 caracteres
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 319B, 10ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: entre 5 y 80
+Sub-folder Nombre de más de 80 caracteres
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 319B, 16ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: entre 5 y 80
 
-└ Celular 0000000000
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 9ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: empezar por 3
+Sub-folder Celular 0000000000
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 19ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: empezar por 3
 
-└ Celular con +57
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 15ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: empezar por 3
+Sub-folder Celular con +57
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 17ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: empezar por 3
 
-└ Celular de 9 dígitos
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 15ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: empezar por 3
+Sub-folder Celular de 9 dígitos
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 345B, 19ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: empezar por 3
 
-└ Celular enviado como número
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 334B, 13ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: clienteCelular
+Sub-folder Celular enviado como número
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 334B, 51ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: clienteCelular
 
-└ Campo que no está en el contrato
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 324B, 9ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: no se permite
+Sub-folder Campo que no está en el contrato
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 324B, 22ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: no se permite
 
-└ Hora ya pasada
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 328B, 22ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: ya pasó
+Sub-folder Hora ya pasada
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 328B, 72ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: ya pasó
 
-└ Fuera de la grilla (10:17)
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 380B, 28ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: no es un cupo
+Sub-folder Fuera de la grilla (10:17)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 380B, 43ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: no es un cupo
 
-└ Madrugada (03:00 Bogotá)
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 380B, 26ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: no es un cupo
+Sub-folder Madrugada (03:00 Bogotá)
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 380B, 32ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: no es un cupo
 
-└ Más de 60 días adelante
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 333B, 24ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: 60 días
+Sub-folder Más de 60 días adelante
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 333B, 30ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: 60 días
 
-└ Fecha con formato inválido
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 326B, 10ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: inicio
+Sub-folder Fecha con formato inválido
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 326B, 15ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: inicio
 
-└ Idempotency-Key que no es UUID
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 319B, 13ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: UUID
+Sub-folder Idempotency-Key que no es UUID
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 319B, 12ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: UUID
 
-└ Sin Idempotency-Key
-  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 308B, 9ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: Idempotency-Key
+Sub-folder Sin Idempotency-Key
+  POST http://localhost:8081/v1/publico/barberia-el-corte/citas [400 Bad Request, 308B, 14ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: Idempotency-Key
 
-└ Disponibilidad de una fecha pasada
-  GET http://localhost:8081/v1/publico/barberia-el-corte/disponibilidad?servicioId=22222222-2222-2222-2222-222222222222&fecha=2026-01-05 [400 Bad Request, 332B, 14ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: ya pasó
+Sub-folder Disponibilidad de una fecha pasada
+  GET http://localhost:8081/v1/publico/barberia-el-corte/disponibilidad?servicioId=22222222-2222-2222-2222-222222222222&fecha=2026-01-05 [400 Bad Request, 332B, 17ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: ya pasó
 
-□ 3. Administración · negocio (X-Negocio-Id)
-└ Agenda del día del profesional
-  GET http://localhost:8081/v1/agenda/33333333-3333-3333-3333-333333333333?fecha=2026-10-29 [200 OK, 1.01kB, 37ms]
-  √  200
+Folder 3. Administración · negocio (X-Negocio-Id)
+Sub-folder Agenda del día del profesional
+  GET http://localhost:8081/v1/agenda/33333333-3333-3333-3333-333333333333?fecha=2026-11-19 [200 OK, 634B, 21ms]
+  Pass  200
 
-└ Registrar resultado de la cita (ATENDIDA)
-  PATCH http://localhost:8081/v1/citas/676d631c-b821-4da9-9d83-88f790ae86ba/estado [204 No Content, 201B, 17ms]
-  √  204
+Sub-folder Registrar resultado de la cita (ATENDIDA)
+  PATCH http://localhost:8081/v1/citas/58538e84-2c7c-44e0-9c27-c8b26011cf15/estado [204 No Content, 201B, 21ms]
+  Pass  204
 
-└ Sin X-Negocio-Id → 400
-  GET http://localhost:8081/v1/agenda/33333333-3333-3333-3333-333333333333?fecha=2026-10-29 [400 Bad Request, 305B, 6ms]
-  √  400 DATOS_INVALIDOS
-  √  mensaje: X-Negocio-Id
+Sub-folder Sin X-Negocio-Id → 400
+  GET http://localhost:8081/v1/agenda/33333333-3333-3333-3333-333333333333?fecha=2026-11-19 [400 Bad Request, 305B, 11ms]
+  Pass  400 DATOS_INVALIDOS
+  Pass  mensaje: X-Negocio-Id
 
-□ 4. Gestión · el cliente opera su cita (token)
-└ Consultar mi cita
-  GET http://localhost:8081/v1/gestion/6cf710556d7a82c6991d0c535871c4f22be4a1cdbb873c34 [200 OK, 630B, 18ms]
-  √  200
+Folder 4. Gestión · el cliente opera su cita (token)
+Sub-folder Consultar mi cita
+  GET http://localhost:8081/v1/gestion/2c70491903ebd622b7145d30fdeb73e740debed2ee70eb57 [200 OK, 630B, 36ms]
+  Pass  200
 
-└ Cancelar mi cita
-  DELETE http://localhost:8081/v1/gestion/6cf710556d7a82c6991d0c535871c4f22be4a1cdbb873c34?confirmar=true [400 Bad Request, 319B, 13ms]
-  √  204 o 400 si ya tiene resultado
+Sub-folder Cancelar mi cita
+  DELETE http://localhost:8081/v1/gestion/2c70491903ebd622b7145d30fdeb73e740debed2ee70eb57?confirmar=true [400 Bad Request, 319B, 21ms]
+  Pass  204 o 400 si ya tiene resultado
 
-□ 5. Gateway GraphQL
-└ panelRecepcion (pantalla completa en una consulta)
-  POST http://localhost:8080/graphql [200 OK, 837B, 227ms]
-  √  200 sin errores GraphQL
+Folder 5. Gateway GraphQL
+Sub-folder panelRecepcion (pantalla completa en una consulta)
+  POST http://localhost:8080/graphql [200 OK, 694B, 185ms]
+  Pass  200 sin errores GraphQL
 
-└ negocio (configuración desde agenda-service)
-  POST http://localhost:8080/graphql [200 OK, 2.41kB, 29ms]
-  √  200 sin errores GraphQL
-  √  los datos vienen de agenda-service
+Sub-folder negocio (configuración desde agenda-service)
+  POST http://localhost:8080/graphql [200 OK, 2.47kB, 41ms]
+  Pass  200 sin errores GraphQL
+  Pass  los datos vienen de agenda-service
 
-└ agenda(profesionalId, fecha)
-  POST http://localhost:8080/graphql [200 OK, 648B, 35ms]
-  √  200 sin errores GraphQL
+Sub-folder agenda(profesionalId, fecha)
+  POST http://localhost:8080/graphql [200 OK, 461B, 64ms]
+  Pass  200 sin errores GraphQL
 
-└ metricas(desde, hasta) con topServicios nombrados
-  POST http://localhost:8080/graphql [200 OK, 448B, 33ms]
-  √  200 sin errores GraphQL
+Sub-folder metricas(desde, hasta) con topServicios nombrados
+  POST http://localhost:8080/graphql [200 OK, 448B, 55ms]
+  Pass  200 sin errores GraphQL
 
-└ crearServicio
-  POST http://localhost:8080/graphql [200 OK, 401B, 21ms]
-  √  200 sin errores GraphQL
+Sub-folder crearServicio
+  POST http://localhost:8080/graphql [200 OK, 401B, 29ms]
+  Pass  200 sin errores GraphQL
 
-└ actualizarServicio
-  POST http://localhost:8080/graphql [200 OK, 383B, 23ms]
-  √  200 sin errores GraphQL
-  √  precio con 2 decimales
+Sub-folder actualizarServicio
+  POST http://localhost:8080/graphql [200 OK, 383B, 29ms]
+  Pass  200 sin errores GraphQL
+  Pass  precio con 2 decimales
 
-└ crearProfesional
-  POST http://localhost:8080/graphql [200 OK, 439B, 41ms]
-  √  200 sin errores GraphQL
+Sub-folder crearProfesional
+  POST http://localhost:8080/graphql [200 OK, 439B, 69ms]
+  Pass  200 sin errores GraphQL
 
-└ definirHorario
-  POST http://localhost:8080/graphql [200 OK, 423B, 41ms]
-  √  200 sin errores GraphQL
-  √  2 franjas
+Sub-folder definirHorario
+  POST http://localhost:8080/graphql [200 OK, 423B, 61ms]
+  Pass  200 sin errores GraphQL
+  Pass  2 franjas
 
-└ crearBloqueo (rango libre, 40 días adelante)
-  POST http://localhost:8080/graphql [200 OK, 410B, 25ms]
-  √  200 sin errores GraphQL
+Sub-folder crearBloqueo (rango libre, 40 días adelante)
+  POST http://localhost:8080/graphql [200 OK, 410B, 35ms]
+  Pass  200 sin errores GraphQL
 
-└ bloqueos(profesionalId)
-  POST http://localhost:8080/graphql [200 OK, 408B, 16ms]
-  √  200 sin errores GraphQL
-  √  incluye el bloqueo recién creado
+Sub-folder bloqueos(profesionalId)
+  POST http://localhost:8080/graphql [200 OK, 408B, 25ms]
+  Pass  200 sin errores GraphQL
+  Pass  incluye el bloqueo recién creado
 
-└ cancelarCita (la de la carpeta 1)
-  POST http://localhost:8080/graphql [200 OK, 489B, 20ms]
-  √  cancelada, o rechazada por tener ya un resultado
+Sub-folder cancelarCita (la de la carpeta 1)
+  POST http://localhost:8080/graphql [200 OK, 489B, 29ms]
+  Pass  cancelada, o rechazada por tener ya un resultado
 
-└ registrarAsistencia con estado no permitido
-  POST http://localhost:8080/graphql [200 OK, 478B, 8ms]
-  √  error DATOS_INVALIDOS en formato GraphQL
+Sub-folder registrarAsistencia con estado no permitido
+  POST http://localhost:8080/graphql [200 OK, 478B, 12ms]
+  Pass  error DATOS_INVALIDOS en formato GraphQL
 
-└ desactivarServicio
-  POST http://localhost:8080/graphql [200 OK, 289B, 19ms]
-  √  200 sin errores GraphQL
-  √  true
+Sub-folder desactivarServicio
+  POST http://localhost:8080/graphql [200 OK, 289B, 24ms]
+  Pass  200 sin errores GraphQL
+  Pass  true
 
-└ ERROR · sin cabecera X-Negocio-Id
-  POST http://localhost:8080/graphql [200 OK, 484B, 7ms]
-  √  error DATOS_INVALIDOS en formato GraphQL
+Sub-folder ERROR · sin cabecera X-Negocio-Id
+  POST http://localhost:8080/graphql [200 OK, 484B, 10ms]
+  Pass  error DATOS_INVALIDOS en formato GraphQL
 
-└ ERROR · negocio inexistente
-  POST http://localhost:8080/graphql [200 OK, 443B, 14ms]
-  √  error NO_ENCONTRADO en formato GraphQL
+Sub-folder ERROR · negocio inexistente
+  POST http://localhost:8080/graphql [200 OK, 443B, 18ms]
+  Pass  error NO_ENCONTRADO en formato GraphQL
 
-└ ERROR · input inválido (se rechaza en el gateway)
-  POST http://localhost:8080/graphql [200 OK, 463B, 8ms]
-  √  error DATOS_INVALIDOS en formato GraphQL
+Sub-folder ERROR · input inválido (se rechaza en el gateway)
+  POST http://localhost:8080/graphql [200 OK, 463B, 11ms]
+  Pass  error DATOS_INVALIDOS en formato GraphQL
 
-└ ERROR · consulta demasiado profunda
-  POST http://localhost:8080/graphql [200 OK, 402B, 8ms]
-  √  se corta por profundidad
+Sub-folder ERROR · consulta demasiado profunda
+  POST http://localhost:8080/graphql [200 OK, 402B, 9ms]
+  Pass  se corta por profundidad
 
-□ 6. Analítica
-└ Métricas del periodo
-  GET http://localhost:8083/v1/metricas?desde=2026-09-01&hasta=2026-12-31 [200 OK, 390B, 12ms]
-  √  200
+Folder 6. Analítica
+Sub-folder Métricas del periodo
+  GET http://localhost:8083/v1/metricas?desde=2026-09-01&hasta=2026-12-31 [200 OK, 390B, 19ms]
+  Pass  200
 
-□ 7. Notificaciones
-└ Mensajes fallidos (citas.dlq)
-  GET http://localhost:8082/v1/mensajes-fallidos [200 OK, 255B, 20ms]
-  √  200
+Folder 7. Notificaciones
+Sub-folder Mensajes fallidos (citas.dlq)
+  GET http://localhost:8082/v1/mensajes-fallidos [200 OK, 255B, 118ms]
+  Pass  200
 
-□ 8. Salud de los servicios
-└ agenda-service
-  GET http://localhost:8081/actuator/health [200 OK, 241B, 12ms]
-  √  UP
+Folder 8. Salud de los servicios
+Sub-folder agenda-service
+  GET http://localhost:8081/actuator/health [200 OK, 241B, 14ms]
+  Pass  UP
 
-└ notificaciones-service
-  GET http://localhost:8082/actuator/health [200 OK, 207B, 11ms]
-  √  UP
+Sub-folder notificaciones-service
+  GET http://localhost:8082/actuator/health [200 OK, 207B, 10ms]
+  Pass  UP
 
-└ analitica-service
-  GET http://localhost:8083/actuator/health [200 OK, 207B, 8ms]
-  √  UP
+Sub-folder analitica-service
+  GET http://localhost:8083/actuator/health [200 OK, 207B, 14ms]
+  Pass  UP
 
-└ gateway-graphql
-  GET http://localhost:8080/actuator/health [200 OK, 207B, 5ms]
-  √  UP
+Sub-folder gateway-graphql
+  GET http://localhost:8080/actuator/health [200 OK, 207B, 7ms]
+  Pass  UP
 
-┌─────────────────────────┬───────────────────┬──────────────────┐
-│                         │          executed │           failed │
-├─────────────────────────┼───────────────────┼──────────────────┤
-│              iterations │                 1 │                0 │
-├─────────────────────────┼───────────────────┼──────────────────┤
-│                requests │                51 │                0 │
-├─────────────────────────┼───────────────────┼──────────────────┤
-│            test-scripts │                51 │                0 │
-├─────────────────────────┼───────────────────┼──────────────────┤
-│      prerequest-scripts │                 3 │                0 │
-├─────────────────────────┼───────────────────┼──────────────────┤
-│              assertions │                77 │                0 │
-├─────────────────────────┴───────────────────┴──────────────────┤
-│ total run duration: 5.3s                                       │
-├────────────────────────────────────────────────────────────────┤
-│ total data received: 12.41kB (approx)                          │
-├────────────────────────────────────────────────────────────────┤
-│ average response time: 22ms [min: 5ms, max: 227ms, s.d.: 30ms] │
-└────────────────────────────────────────────────────────────────┘
+------------------------------------------------------------------
+|                         |          executed |           failed |
+--------------------------+-------------------+-------------------
+|              iterations |                 1 |                0 |
+--------------------------+-------------------+-------------------
+|                requests |                51 |                0 |
+--------------------------+-------------------+-------------------
+|            test-scripts |                51 |                0 |
+--------------------------+-------------------+-------------------
+|      prerequest-scripts |                 3 |                0 |
+--------------------------+-------------------+-------------------
+|              assertions |                77 |                0 |
+------------------------------------------------------------------
+| total run duration: 5.8s                                       |
+------------------------------------------------------------------
+| total data received: 11.92kB (approx)                          |
+------------------------------------------------------------------
+| average response time: 34ms [min: 7ms, max: 185ms, s.d.: 32ms] |
+------------------------------------------------------------------

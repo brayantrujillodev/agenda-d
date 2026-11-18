@@ -1,8 +1,8 @@
 # Evidencia · P3 – Entrega 1 · Gateway GraphQL
 
-Generado por `docs/evidencias/flujo-p3.mjs` el 2026-10-29T01:51:58.368Z contra el stack real
+Generado por `docs/evidencias/flujo-p3.mjs` el 2026-11-18T17:37:12.189Z contra el stack real
 (`docker compose --profile full up -d --build`). Cada bloque es una petición real y su respuesta
-sin editar. Fecha de prueba: `2026-10-30` (hora local de Bogotá).
+sin editar. Fecha de prueba: `2026-11-20` (hora local de Bogotá).
 
 ## Resumen
 
@@ -55,7 +55,7 @@ Un solo comando levanta todo; cada servicio expone `/actuator/health`.
 
 Reservar no pasa por GraphQL: es la ruta pública, sin cuenta (ver encabezado de `schema.graphqls`).
 
-`GET /v1/publico/barberia-el-corte/disponibilidad?...` → HTTP 200, 10 cupos. Se toma el primero: `2026-10-30T13:00:00Z` (08:00).
+`GET /v1/publico/barberia-el-corte/disponibilidad?...` → HTTP 200, 9 cupos. Se toma el primero: `2026-11-20T14:00:00Z` (09:00).
 
 **Petición** `POST /v1/publico/barberia-el-corte/citas`
 
@@ -63,7 +63,7 @@ Reservar no pasa por GraphQL: es la ruta pública, sin cuenta (ver encabezado de
 {
   "servicioId": "22222222-2222-2222-2222-222222222222",
   "profesionalId": "33333333-3333-3333-3333-333333333333",
-  "inicio": "2026-10-30T13:00:00Z",
+  "inicio": "2026-11-20T14:00:00Z",
   "clienteNombre": "Juan Pérez",
   "clienteCelular": "3001234567"
 }
@@ -73,43 +73,43 @@ Reservar no pasa por GraphQL: es la ruta pública, sin cuenta (ver encabezado de
 
 ```json
 {
-  "id": "d491fd82-bef2-4186-b9ba-31f724cdfcfd",
-  "inicio": "2026-10-30T13:00:00Z",
-  "fin": "2026-10-30T14:00:00Z",
-  "horaLocal": "08:00",
+  "id": "2cdc198f-b66b-4840-a03a-337e1cd1b609",
+  "inicio": "2026-11-20T14:00:00Z",
+  "fin": "2026-11-20T15:00:00Z",
+  "horaLocal": "09:00",
   "servicioNombre": "Corte de cabello",
   "profesionalNombre": "Laura",
   "estado": "CONFIRMADA",
-  "enlaceGestion": "http://localhost:8081/v1/gestion/893bdfc9b5a78afe28b93bc09911c08a6ebd104a60182361"
+  "enlaceGestion": "http://localhost:8081/v1/gestion/c59bbc412ef4a446bb773034dabe6df7cd932fc3a32382b0"
 }
 ```
 
-- ✅ **Reserva creada** — cita d491fd82-bef2-4186-b9ba-31f724cdfcfd
+- ✅ **Reserva creada** — cita 2cdc198f-b66b-4840-a03a-337e1cd1b609
 
-Segunda reserva, con Andrés a las 09:00, para que el panel componga a dos profesionales.
+Segunda reserva, con Andrés a las 11:00, para que el panel componga a dos profesionales.
 
 ## 2. El evento llega a analitica por outbox → Kafka
 
 Se espera a que el relay publique `citas.reservadas` y analitica-service lo proyecte.
 
-**Petición** `GET /v1/metricas?desde=2026-10-01&hasta=2026-10-30`
+**Petición** `GET /v1/metricas?desde=2026-11-01&hasta=2026-11-20`
 
 **Respuesta** HTTP 200
 
 ```json
 {
-  "desde": "2026-10-01",
-  "hasta": "2026-10-30",
-  "totalCitas": 2,
+  "desde": "2026-11-01",
+  "hasta": "2026-11-20",
+  "totalCitas": 4,
   "atendidas": 0,
-  "noAsistio": 0,
-  "canceladas": 0,
-  "ocupacion": 10,
-  "tasaInasistencia": 0,
+  "noAsistio": 1,
+  "canceladas": 1,
+  "ocupacion": 15,
+  "tasaInasistencia": 100,
   "topServicios": [
     {
       "servicioId": "22222222-2222-2222-2222-222222222222",
-      "cantidad": 2
+      "cantidad": 4
     }
   ]
 }
@@ -135,7 +135,7 @@ query Panel($fecha: Date) {
 }
 ```
 
-Variables: `{"fecha":"2026-10-30"}`
+Variables: `{"fecha":"2026-11-20"}`
 
 **Respuesta** HTTP 200
 
@@ -143,14 +143,14 @@ Variables: `{"fecha":"2026-10-30"}`
 {
   "data": {
     "panelRecepcion": {
-      "fecha": "2026-10-30",
+      "fecha": "2026-11-20",
       "negocio": {
         "nombre": "Barbería El Corte",
         "zonaHoraria": "America/Bogota"
       },
       "citasDelDia": [
         {
-          "id": "d491fd82-bef2-4186-b9ba-31f724cdfcfd",
+          "id": "ab54323f-8247-4704-aff9-386308674d28",
           "horaLocal": "08:00",
           "clienteNombre": "Juan Pérez",
           "clienteCelular": "300****567",
@@ -163,8 +163,60 @@ Variables: `{"fecha":"2026-10-30"}`
           }
         },
         {
-          "id": "ff15de64-b373-4876-98a0-4053e1ab61f3",
+          "id": "a364e4f6-9b07-4831-8ca6-bb8b8e6938a2",
           "horaLocal": "09:00",
+          "clienteNombre": "María Gómez",
+          "clienteCelular": "310****543",
+          "estado": "CONFIRMADA",
+          "servicio": {
+            "nombre": "Corte de cabello"
+          },
+          "profesional": {
+            "nombre": "Andrés"
+          }
+        },
+        {
+          "id": "b4f0209c-380b-45b6-b8ca-a11833e4ee5d",
+          "horaLocal": "09:00",
+          "clienteNombre": "Juan Pérez",
+          "clienteCelular": "300****567",
+          "estado": "CANCELADA",
+          "servicio": {
+            "nombre": "Corte de cabello"
+          },
+          "profesional": {
+            "nombre": "Laura"
+          }
+        },
+        {
+          "id": "2cdc198f-b66b-4840-a03a-337e1cd1b609",
+          "horaLocal": "09:00",
+          "clienteNombre": "Juan Pérez",
+          "clienteCelular": "300****567",
+          "estado": "CONFIRMADA",
+          "servicio": {
+            "nombre": "Corte de cabello"
+          },
+          "profesional": {
+            "nombre": "Laura"
+          }
+        },
+        {
+          "id": "83324eec-bf7f-4111-a86d-cd75da8a3b77",
+          "horaLocal": "10:00",
+          "clienteNombre": "María Gómez",
+          "clienteCelular": "310****543",
+          "estado": "NO_ASISTIO",
+          "servicio": {
+            "nombre": "Corte de cabello"
+          },
+          "profesional": {
+            "nombre": "Andrés"
+          }
+        },
+        {
+          "id": "0a4e46bb-1e7f-4a52-b4bf-941ff904b224",
+          "horaLocal": "11:00",
           "clienteNombre": "María Gómez",
           "clienteCelular": "310****543",
           "estado": "CONFIRMADA",
@@ -177,17 +229,17 @@ Variables: `{"fecha":"2026-10-30"}`
         }
       ],
       "metricasDelMes": {
-        "desde": "2026-10-01",
-        "hasta": "2026-10-30",
-        "totalCitas": 2,
+        "desde": "2026-11-01",
+        "hasta": "2026-11-20",
+        "totalCitas": 4,
         "atendidas": 0,
-        "noAsistio": 0,
-        "canceladas": 0,
-        "ocupacion": 10,
-        "tasaInasistencia": 0,
+        "noAsistio": 1,
+        "canceladas": 1,
+        "ocupacion": 15,
+        "tasaInasistencia": 100,
         "topServicios": [
           {
-            "cantidad": 2,
+            "cantidad": 4,
             "servicio": {
               "nombre": "Corte de cabello"
             }
@@ -234,6 +286,12 @@ Variables: `{"fecha":"2026-10-30"}`
           "duracionMin": 60,
           "precio": "25000.00",
           "activo": true
+        },
+        {
+          "nombre": "Corte y barba premium",
+          "duracionMin": 90,
+          "precio": "40000.00",
+          "activo": false
         }
       ],
       "profesionales": [
@@ -274,6 +332,34 @@ Variables: `{"fecha":"2026-10-30"}`
               "diaSemana": 6,
               "horaInicio": "08:00",
               "horaFin": "18:00"
+            }
+          ]
+        },
+        {
+          "nombre": "Camila",
+          "servicios": [
+            {
+              "nombre": "Corte y barba premium"
+            },
+            {
+              "nombre": "Corte de cabello"
+            }
+          ],
+          "horarios": [
+            {
+              "diaSemana": 1,
+              "horaInicio": "08:00",
+              "horaFin": "12:00"
+            },
+            {
+              "diaSemana": 1,
+              "horaInicio": "14:00",
+              "horaFin": "18:00"
+            },
+            {
+              "diaSemana": 3,
+              "horaInicio": "09:00",
+              "horaFin": "17:00"
             }
           ]
         },
@@ -334,7 +420,7 @@ Variables: `{"fecha":"2026-10-30"}`
 query($p: ID!, $f: Date!) { agenda(profesionalId: $p, fecha: $f) { horaLocal clienteNombre estado } }
 ```
 
-Variables: `{"p":"33333333-3333-3333-3333-333333333334","f":"2026-10-30"}`
+Variables: `{"p":"33333333-3333-3333-3333-333333333334","f":"2026-11-20"}`
 
 **Respuesta** HTTP 200
 
@@ -344,6 +430,16 @@ Variables: `{"p":"33333333-3333-3333-3333-333333333334","f":"2026-10-30"}`
     "agenda": [
       {
         "horaLocal": "09:00",
+        "clienteNombre": "María Gómez",
+        "estado": "CONFIRMADA"
+      },
+      {
+        "horaLocal": "10:00",
+        "clienteNombre": "María Gómez",
+        "estado": "NO_ASISTIO"
+      },
+      {
+        "horaLocal": "11:00",
         "clienteNombre": "María Gómez",
         "estado": "CONFIRMADA"
       }
@@ -372,7 +468,7 @@ Variables: `{"e":{"nombre":"Corte y barba","duracionMin":90,"precio":35000}}`
 {
   "data": {
     "crearServicio": {
-      "id": "6201be8c-95e3-4340-a05a-7859f3409570",
+      "id": "b1e98271-83c6-4910-bd73-59f462855744",
       "nombre": "Corte y barba",
       "duracionMin": 90,
       "precio": "35000.00",
@@ -390,7 +486,7 @@ Variables: `{"e":{"nombre":"Corte y barba","duracionMin":90,"precio":35000}}`
 mutation($id: ID!, $e: ServicioInput!) { actualizarServicio(id: $id, entrada: $e) { nombre precio } }
 ```
 
-Variables: `{"id":"6201be8c-95e3-4340-a05a-7859f3409570","e":{"nombre":"Corte y barba premium","duracionMin":90,"precio":"40000"}}`
+Variables: `{"id":"b1e98271-83c6-4910-bd73-59f462855744","e":{"nombre":"Corte y barba premium","duracionMin":90,"precio":"40000"}}`
 
 **Respuesta** HTTP 200
 
@@ -413,7 +509,7 @@ Variables: `{"id":"6201be8c-95e3-4340-a05a-7859f3409570","e":{"nombre":"Corte y 
 mutation($e: ProfesionalInput!) { crearProfesional(entrada: $e) { id nombre activo servicios { nombre } horarios { diaSemana } } }
 ```
 
-Variables: `{"e":{"nombre":"Camila","serviciosIds":["6201be8c-95e3-4340-a05a-7859f3409570","22222222-2222-2222-2222-222222222222"]}}`
+Variables: `{"e":{"nombre":"Camila","serviciosIds":["b1e98271-83c6-4910-bd73-59f462855744","22222222-2222-2222-2222-222222222222"]}}`
 
 **Respuesta** HTTP 200
 
@@ -421,7 +517,7 @@ Variables: `{"e":{"nombre":"Camila","serviciosIds":["6201be8c-95e3-4340-a05a-785
 {
   "data": {
     "crearProfesional": {
-      "id": "15737e73-de5b-4134-aa93-2b57e07b54d9",
+      "id": "2dfe838a-8682-4abb-9567-b1d2763a6117",
       "nombre": "Camila",
       "activo": true,
       "servicios": [
@@ -446,7 +542,7 @@ Variables: `{"e":{"nombre":"Camila","serviciosIds":["6201be8c-95e3-4340-a05a-785
 mutation($p: ID!, $h: [HorarioInput!]!) { definirHorario(profesionalId: $p, horarios: $h) { nombre horarios { diaSemana horaInicio horaFin } } }
 ```
 
-Variables: `{"p":"15737e73-de5b-4134-aa93-2b57e07b54d9","h":[{"diaSemana":1,"horaInicio":"08:00","horaFin":"12:00"},{"diaSemana":1,"horaInicio":"14:00","horaFin":"18:00"},{"diaSemana":3,"horaInicio":"09:00","horaFin":"17:00"}]}`
+Variables: `{"p":"2dfe838a-8682-4abb-9567-b1d2763a6117","h":[{"diaSemana":1,"horaInicio":"08:00","horaFin":"12:00"},{"diaSemana":1,"horaInicio":"14:00","horaFin":"18:00"},{"diaSemana":3,"horaInicio":"09:00","horaFin":"17:00"}]}`
 
 **Respuesta** HTTP 200
 
@@ -487,7 +583,7 @@ Bloquear un rango que contiene la cita de Juan Pérez: agenda-service lo rechaza
 mutation($e: BloqueoInput!) { crearBloqueo(entrada: $e) { id inicio fin motivo } }
 ```
 
-Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio":"2026-10-30T12:00:00.000Z","fin":"2026-10-30T14:00:00.000Z","motivo":"Incapacidad"}}`
+Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio":"2026-11-20T13:00:00.000Z","fin":"2026-11-20T15:00:00.000Z","motivo":"Incapacidad"}}`
 
 **Respuesta** HTTP 200
 
@@ -495,7 +591,7 @@ Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio
 {
   "errors": [
     {
-      "message": "Hay 1 cita confirmada en ese rango. Cancélalas antes de bloquearlo.",
+      "message": "Hay 2 citas confirmadas en ese rango. Cancélalas antes de bloquearlo.",
       "locations": [
         {
           "line": 1,
@@ -523,7 +619,7 @@ Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio
 mutation($e: BloqueoInput!) { crearBloqueo(entrada: $e) { id inicio fin motivo } }
 ```
 
-Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio":"2026-12-08T13:00:00Z","fin":"2026-12-08T23:00:00Z","motivo":"Capacitación"}}`
+Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio":"2026-12-28T13:00:00Z","fin":"2026-12-28T23:00:00Z","motivo":"Capacitación"}}`
 
 **Respuesta** HTTP 200
 
@@ -531,9 +627,9 @@ Variables: `{"e":{"profesionalId":"33333333-3333-3333-3333-333333333333","inicio
 {
   "data": {
     "crearBloqueo": {
-      "id": "0c3d605a-835c-40ce-be99-97602652ca73",
-      "inicio": "2026-12-08T13:00:00Z",
-      "fin": "2026-12-08T23:00:00Z",
+      "id": "d9e0a6aa-871d-4920-99c7-3b0882b7bd98",
+      "inicio": "2026-12-28T13:00:00Z",
+      "fin": "2026-12-28T23:00:00Z",
       "motivo": "Capacitación"
     }
   }
@@ -557,8 +653,13 @@ Variables: `{"p":"33333333-3333-3333-3333-333333333333"}`
   "data": {
     "bloqueos": [
       {
-        "inicio": "2026-12-08T13:00:00Z",
-        "fin": "2026-12-08T23:00:00Z",
+        "inicio": "2026-12-28T13:00:00Z",
+        "fin": "2026-12-28T23:00:00Z",
+        "motivo": "Capacitación"
+      },
+      {
+        "inicio": "2026-12-28T13:00:00Z",
+        "fin": "2026-12-28T23:00:00Z",
         "motivo": "Capacitación"
       }
     ]
@@ -574,7 +675,7 @@ Variables: `{"p":"33333333-3333-3333-3333-333333333333"}`
 mutation($c: ID!) { cancelarCita(citaId: $c, motivo: "El profesional se incapacitó") { id estado horaLocal clienteCelular } }
 ```
 
-Variables: `{"c":"d491fd82-bef2-4186-b9ba-31f724cdfcfd"}`
+Variables: `{"c":"2cdc198f-b66b-4840-a03a-337e1cd1b609"}`
 
 **Respuesta** HTTP 200
 
@@ -582,9 +683,9 @@ Variables: `{"c":"d491fd82-bef2-4186-b9ba-31f724cdfcfd"}`
 {
   "data": {
     "cancelarCita": {
-      "id": "d491fd82-bef2-4186-b9ba-31f724cdfcfd",
+      "id": "2cdc198f-b66b-4840-a03a-337e1cd1b609",
       "estado": "CANCELADA",
-      "horaLocal": "08:00",
+      "horaLocal": "09:00",
       "clienteCelular": "300****567"
     }
   }
@@ -601,7 +702,7 @@ Registrar asistencia sobre la cita recién cancelada: la regla la aplica agenda-
 mutation($c: ID!) { registrarAsistencia(citaId: $c, estado: ATENDIDA) { estado } }
 ```
 
-Variables: `{"c":"d491fd82-bef2-4186-b9ba-31f724cdfcfd"}`
+Variables: `{"c":"2cdc198f-b66b-4840-a03a-337e1cd1b609"}`
 
 **Respuesta** HTTP 200
 
@@ -637,7 +738,7 @@ Variables: `{"c":"d491fd82-bef2-4186-b9ba-31f724cdfcfd"}`
 mutation($c: ID!) { registrarAsistencia(citaId: $c, estado: NO_ASISTIO) { estado clienteNombre } }
 ```
 
-Variables: `{"c":"ff15de64-b373-4876-98a0-4053e1ab61f3"}`
+Variables: `{"c":"0a4e46bb-1e7f-4a52-b4bf-941ff904b224"}`
 
 **Respuesta** HTTP 200
 
@@ -660,7 +761,7 @@ Variables: `{"c":"ff15de64-b373-4876-98a0-4053e1ab61f3"}`
 mutation($id: ID!) { desactivarServicio(id: $id) }
 ```
 
-Variables: `{"id":"6201be8c-95e3-4340-a05a-7859f3409570"}`
+Variables: `{"id":"b1e98271-83c6-4910-bd73-59f462855744"}`
 
 **Respuesta** HTTP 200
 
@@ -677,7 +778,7 @@ Variables: `{"id":"6201be8c-95e3-4340-a05a-7859f3409570"}`
 **Log de notificaciones-service** (la cancelación del panel llegó por `citas.canceladas`):
 
 ```text
-2026-10-29T01:52:05.183Z  INFO 1 --- [notificaciones-service] [ntainer#1-0-C-1] c.e.f.a.n.c.CitasEventoConsumidor        : citas.canceladas procesado: evento 7bf5859e-9257-480b-a5fc-f14275daab7f cita d491fd82-bef2-4186-b9ba-31f724cdfcfd correlationId ae81480c-5cee-44f1-a9d6-94ee4ca78b12
+2026-11-18T17:37:14.524Z  INFO 1 --- [notificaciones-service] [ntainer#1-0-C-1] c.e.f.a.n.c.CitasEventoConsumidor        : citas.canceladas procesado: evento 7722277d-5010-4623-92ba-61b9d92bea67 cita 2cdc198f-b66b-4840-a03a-337e1cd1b609 correlationId 7ee27c2d-6d6c-4846-8f96-ef26b9cd881d
 ```
 
 - ✅ **notificaciones-service consumió la cancelación hecha desde el panel**
@@ -801,7 +902,7 @@ Variables: `{"e":{"nombre":"X","duracionMin":2,"precio":-5}}`
 **Petición** `POST /graphql` · cabeceras: `X-Negocio-Id: 11111111-1111-1111-1111-111111111111`
 
 ```graphql
-{ agenda(profesionalId: "../../v1/negocio", fecha: "2026-10-30") { id } }
+{ agenda(profesionalId: "../../v1/negocio", fecha: "2026-11-20") { id } }
 ```
 
 **Respuesta** HTTP 200
@@ -842,7 +943,7 @@ Se detiene el contenedor `agd-analitica` y se pide el panel. La agenda sale; `me
 query($fecha: Date) { panelRecepcion(fecha: $fecha) { citasDelDia { horaLocal clienteNombre estado } metricasDelMes { totalCitas } } }
 ```
 
-Variables: `{"fecha":"2026-10-30"}`
+Variables: `{"fecha":"2026-11-20"}`
 
 **Respuesta** HTTP 200
 
@@ -873,10 +974,30 @@ Variables: `{"fecha":"2026-10-30"}`
         {
           "horaLocal": "08:00",
           "clienteNombre": "Juan Pérez",
+          "estado": "CONFIRMADA"
+        },
+        {
+          "horaLocal": "09:00",
+          "clienteNombre": "María Gómez",
+          "estado": "CONFIRMADA"
+        },
+        {
+          "horaLocal": "09:00",
+          "clienteNombre": "Juan Pérez",
           "estado": "CANCELADA"
         },
         {
           "horaLocal": "09:00",
+          "clienteNombre": "Juan Pérez",
+          "estado": "CANCELADA"
+        },
+        {
+          "horaLocal": "10:00",
+          "clienteNombre": "María Gómez",
+          "estado": "NO_ASISTIO"
+        },
+        {
+          "horaLocal": "11:00",
           "clienteNombre": "María Gómez",
           "estado": "NO_ASISTIO"
         }
@@ -928,13 +1049,13 @@ En el perfil `prod` (`docker-compose.prod.yml` → `SPRING_PROFILES_ACTIVE=prod`
 
 Se disparan 130 consultas seguidas desde la misma IP (límite: 120 por minuto, contando las de los pasos anteriores). Rechazadas con 429: **31**.
 
-Ejemplo de rechazo (cabecera `Retry-After: 43`):
+Ejemplo de rechazo (cabecera `Retry-After: 36`):
 
 ```json
 {
   "errors": [
     {
-      "message": "Hiciste demasiadas consultas seguidas. Espera 43 segundos e intenta de nuevo.",
+      "message": "Hiciste demasiadas consultas seguidas. Espera 36 segundos e intenta de nuevo.",
       "extensions": {
         "codigo": "DEMASIADAS_PETICIONES",
         "classification": "BAD_REQUEST"

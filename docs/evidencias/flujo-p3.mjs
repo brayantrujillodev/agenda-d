@@ -351,7 +351,9 @@ md('### 7.3 Rate limiting');
 md();
 let rechazadas = 0;
 let ejemplo = null;
-const lote = await Promise.all(Array.from({ length: 130 }, () => gql('{ __typename }')));
+// En serie: 130 conexiones simultáneas desde Windows/Docker Desktop provocan ECONNRESET ajenos al límite.
+const lote = [];
+for (let i = 0; i < 130; i++) lote.push(await gql('{ __typename }'));
 for (const r of lote) {
   if (r.estado === 429) { rechazadas++; ejemplo = ejemplo || r; }
 }
