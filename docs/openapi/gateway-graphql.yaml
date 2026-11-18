@@ -37,6 +37,28 @@ paths:
         pedir (`panelRecepcion`, `negocio`, `agenda`, `metricas`,
         `bloqueos`, y las mutaciones de configuración) vive en el esquema
         GraphQL, no aquí.
+
+        Los errores van en `errors[]` con HTTP 200, como manda GraphQL:
+        `message` en español, `extensions.codigo` (el mismo código del
+        servicio interno, p. ej. `NO_ENCONTRADO`, `CITAS_EN_RANGO`,
+        `SERVICIO_NO_DISPONIBLE`) y `extensions.classification`.
+      parameters:
+        - name: X-Negocio-Id
+          in: header
+          required: true
+          description: |
+            Negocio de la petición. El gateway la reenvía a agenda-service y
+            analitica-service. Sin ella, cada campo responde DATOS_INVALIDOS.
+          schema:
+            type: string
+            format: uuid
+          example: 11111111-1111-1111-1111-111111111111
+        - name: X-Correlation-Id
+          in: header
+          required: false
+          description: Se reenvía a los servicios; si falta, el gateway genera uno.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -64,12 +86,34 @@ paths:
                   errors:
                     type: array
                     items:
-                      type: object
+                      $ref: '#/components/schemas/ErrorGraphql'
+        '429':
+          description: |
+            Más de 120 peticiones por minuto desde la misma IP. Trae
+            `Retry-After` (segundos) y el cuerpo con formato de error GraphQL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ErrorGraphql'
+              example:
+                errors:
+                  - message: Hiciste demasiadas consultas seguidas. Espera 12 segundos e intenta de nuevo.
+                    extensions:
+                      codigo: DEMASIADAS_PETICIONES
+                      classification: BAD_REQUEST
 
   /graphiql:
     get:
       tags: [GraphQL]
       summary: Explorador interactivo del esquema (solo para desarrollo)
+      description: |
+        Apagado en el perfil `prod` junto con la introspección
+        (application-prod.yml).
       responses:
         '200':
           description: Página HTML de GraphiQL
@@ -90,6 +134,25 @@ paths:
 
 components:
   schemas:
+    ErrorGraphql:
+      type: object
+      properties:
+        message:
+          type: string
+          description: En español y accionable. Nunca un stacktrace.
+        path:
+          type: array
+          items:
+            type: string
+        extensions:
+          type: object
+          properties:
+            codigo:
+              type: string
+              example: SERVICIO_NO_DISPONIBLE
+            classification:
+              type: string
+              example: INTERNAL_ERROR
     Salud:
       type: object
       properties:

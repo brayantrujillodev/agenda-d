@@ -1,0 +1,23 @@
+# Use this workspace to collaborate
+workspace:
+  id: f42c474c-5015-405f-8b41-768051d36f41
+
+localResources:
+  collections:
+    - ../docs/postman/AGENDA-D.postman_collection.json
+  specs:
+    - ../docs/graphql/schema.graphqls
+    - ../docs/openapi/agenda-service.yaml
+    - ../docs/openapi/analitica-service.yaml
+    - ../docs/openapi/gateway-graphql.yaml
+    - ../docs/openapi/notificaciones-service.yaml
+    - ../agenda-service/target/classes/openapi/agenda-service.yaml
+    - ../analitica-service/target/classes/openapi/analitica-service.yaml
+    - ../gateway-graphql/target/classes/graphql/schema.graphqls
+    - ../gateway-graphql/target/classes/openapi/gateway-graphql.yaml
+    - ../notificaciones-service/target/classes/openapi/notificaciones-service.yaml
+    - ../agenda-service/src/main/resources/openapi/agenda-service.yaml
+    - ../analitica-service/src/main/resources/openapi/analitica-service.yaml
+    - ../gateway-graphql/src/main/resources/graphql/schema.graphqls
+    - ../gateway-graphql/src/main/resources/openapi/gateway-graphql.yaml
+    - ../notificaciones-service/src/main/resources/openapi/notificaciones-service.yaml

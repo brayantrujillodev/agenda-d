@@ -24,7 +24,7 @@
         <!-- 1.19.8 (la que trae spring-boot-starter-parent:3.3.5) negocia mal
              la versión de la API de Docker contra Docker Desktop reciente en
              Windows ("client version 1.32 is too old"). Versión más nueva. -->
-        <testcontainers.version>1.20.4</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencies>

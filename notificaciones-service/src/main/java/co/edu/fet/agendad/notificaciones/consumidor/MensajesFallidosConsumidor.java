@@ -37,11 +37,16 @@ public class MensajesFallidosConsumidor {
     public void alCaerUnMensaje(
             @Payload String payload,
             @Header(name = KafkaHeaders.DLT_ORIGINAL_TOPIC, required = false) String topicoOrigen,
-            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String motivo) {
+            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String motivo,
+            @Header(name = KafkaHeaders.DLT_EXCEPTION_FQCN, required = false) String tipoExcepcion) {
 
         String origen = topicoOrigen != null ? topicoOrigen : "desconocido";
+        // Un mensaje que no se pudo ni deserializar no se reintenta: reintentar
+        // no lo vuelve JSON válido. Llega aquí tras un único intento.
+        int intentos = tipoExcepcion != null && tipoExcepcion.endsWith("DeserializationException")
+                ? 1 : INTENTOS_ANTES_DE_LLEGAR_AQUI;
         mensajeFallidoRepository.save(new MensajeFallido(
-                UUID.randomUUID(), origen, payload, motivo, INTENTOS_ANTES_DE_LLEGAR_AQUI));
+                UUID.randomUUID(), origen, payload, motivo, intentos));
 
         log.warn("Mensaje de {} agotó los reintentos y quedó en citas.dlq: {}", origen, motivo);
     }

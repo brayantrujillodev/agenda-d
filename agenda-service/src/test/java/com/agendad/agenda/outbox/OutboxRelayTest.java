@@ -61,6 +61,22 @@ class OutboxRelayTest {
     }
 
     @Test
+    void siUnEnvioFalla_noPublicaLosPosterioresParaNoAlterarElOrden() {
+        Outbox a = pendiente();
+        Outbox b = pendiente();
+        when(outboxRepo.findTop100ByEnviadoEnIsNullOrderByCreadoEnAsc()).thenReturn(List.of(a, b));
+        when(kafka.send(anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("kafka caído")));
+
+        relay.publicarPendientes();
+
+        verify(kafka, times(1)).send(anyString(), anyString(), anyString());
+        assertThat(a.getIntentos()).isEqualTo(1);
+        assertThat(b.getEnviadoEn()).isNull();
+        assertThat(b.getIntentos()).isZero();
+    }
+
+    @Test
     void sinPendientes_noTocaKafka() {
         when(outboxRepo.findTop100ByEnviadoEnIsNullOrderByCreadoEnAsc()).thenReturn(List.of());
 

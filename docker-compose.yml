@@ -2,15 +2,13 @@
 # AGENDA-D · Infraestructura y servicios
 #
 # ESTADO ACTUAL
-#   Solo el perfil `infra` funciona hoy. Los servicios Java están
-#   definidos porque representan la infraestructura prevista, pero sus
-#   proyectos aún no existen: hasta que cada carpeta tenga su pom.xml y
-#   su Dockerfile, `--profile core` y `--profile full` fallarán en el build.
+#   Los tres perfiles levantan sin errores: los cuatro proyectos Java
+#   existen y construyen su imagen con `--build`.
 #
 # PERFILES
-#   --profile infra  → postgres + kafka + consola     FUNCIONA HOY
-#   --profile core   → infra + agenda-service         requiere el proyecto
-#   --profile full   → todo                           requiere los cuatro
+#   --profile infra  → postgres + kafka + tópicos + consola + pgAdmin
+#   --profile core   → postgres + kafka + tópicos + agenda-service
+#   --profile full   → todo: los tres servicios, el gateway y las consolas
 #
 # Alguien del equipo tiene 8 GB de RAM: usen el perfil más pequeño que
 # les sirva. Por eso hay límites de memoria en cada contenedor.
@@ -79,20 +77,75 @@ services:
     mem_limit: 1g
     networks: [agenda-net]
 
+  # Declara los tópicos del contrato (docs/eventos/CONTRATO-EVENTOS.md) en
+  # vez de depender del auto-create del broker: 3 particiones y 7 días de
+  # retención, explícitos. Corre una vez y termina; es idempotente
+  # (--if-not-exists + alter), así que relanzarlo no rompe nada.
+  kafka-init:
+    image: bitnamilegacy/kafka:3.7
+    container_name: agd-kafka-init
+    profiles: [infra, core, full]
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        for t in citas.reservadas citas.canceladas citas.estado citas.dlq; do
+          kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists \
+            --topic "$$t" --partitions 3 --replication-factor 1
+          kafka-configs.sh --bootstrap-server kafka:9092 --alter \
+            --entity-type topics --entity-name "$$t" --add-config retention.ms=604800000
+        done
+        kafka-topics.sh --bootstrap-server kafka:9092 --describe | grep -E '^Topic: citas'
+    depends_on:
+      kafka: { condition: service_healthy }
+    restart: "no"
+    mem_limit: 256m
+    networks: [agenda-net]
+
   # Consola para ver tópicos, particiones y retrasos de consumo.
   # Útil para la sustentación.
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:v0.7.2
     container_name: agd-kafka-ui
     profiles: [infra, full]
     environment:
       KAFKA_CLUSTERS_0_NAME: agenda-d
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       DYNAMIC_CONFIG_ENABLED: "true"
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_COM_PROVECTUS: INFO
     ports:
       - "8090:8080"
     depends_on:
       kafka: { condition: service_healthy }
+    mem_limit: 384m
+    networks: [agenda-net]
+
+  # Ver los datos guardados (citas, outbox, notificaciones, analítica) sin
+  # instalar nada: http://localhost:5050. Sin login y con el servidor
+  # AGENDA-D ya registrado (pgadmin/servers.json). Solo para desarrollo.
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: agd-pgadmin
+    profiles: [infra, full]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@agendad.com
+      PGADMIN_DEFAULT_PASSWORD: agendad
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    # libpq ignora un pgpass con permisos abiertos, y un archivo montado
+    # desde Windows siempre los tiene: se crea dentro con 600 al arrancar.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - echo 'postgres:5432:*:agendad:agendad' > /tmp/pgpass && chmod 600 /tmp/pgpass && exec /entrypoint.sh
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres: { condition: service_healthy }
     mem_limit: 384m
     networks: [agenda-net]
 
@@ -112,12 +165,15 @@ services:
       SPRING_DATASOURCE_USERNAME: agendad
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
+      LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
       - "8081:8081"          # la ruta pública del cliente entra por aquí
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
       interval: 10s
@@ -136,6 +192,8 @@ services:
       SPRING_DATASOURCE_USERNAME: agendad
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
+      LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
       # REGISTRO = guarda el mensaje en BD en vez de enviarlo. Sin costo.
       AGENDAD_CANAL_POR_DEFECTO: REGISTRO
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
@@ -144,6 +202,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
     mem_limit: 512m
     networks: [agenda-net]
 
@@ -158,7 +217,17 @@ services:
     ports:
       - "8080:8080"          # el panel de recepción consume esto
     depends_on:
+      # Si arrancara antes que analitica, metricasDelMes saldría en null con
+      # SERVICIO_NO_DISPONIBLE en errors[] (no con ceros falsos), pero mejor
+      # que el panel abra completo desde el primer intento.
       agenda-service: { condition: service_healthy }
+      analitica-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     mem_limit: 512m
     networks: [agenda-net]
 
@@ -171,12 +240,21 @@ services:
       SPRING_DATASOURCE_USERNAME: agendad
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
+      LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
       - "8083:8083"
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     mem_limit: 512m
     networks: [agenda-net]
 

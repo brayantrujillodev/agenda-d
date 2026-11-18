@@ -16,7 +16,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: none # Regla del proyecto: nunca ddl-auto: update
+      ddl-auto: none  # Regla del proyecto: nunca ddl-auto: update
 
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:29092}

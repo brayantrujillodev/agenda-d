@@ -19,6 +19,7 @@ import com.agendad.agenda.dominio.Negocio;
 import com.agendad.agenda.dominio.Outbox;
 import com.agendad.agenda.dominio.Profesional;
 import com.agendad.agenda.dominio.Servicio;
+import com.agendad.agenda.outbox.evento.EventoCitaCancelada;
 import com.agendad.agenda.repositorio.CitaRepository;
 import com.agendad.agenda.repositorio.NegocioRepository;
 import com.agendad.agenda.repositorio.OutboxRepository;
@@ -165,5 +166,56 @@ class AgendaServiceTest {
                 o.getTipoEvento().equals("citas.estado")
                         && o.getClaveParticion().equals(PROFESIONAL_ID.toString())
                         && o.getNegocioId().equals(NEGOCIO_ID)));
+    }
+    @Test
+    void cancelar_citaDeOtroNegocio_devuelve404() {
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.cancelar(NEGOCIO_ID, CITA_ID, null, null))
+                .isInstanceOf(RecursoNoEncontrado.class);
+        verify(outboxRepo, never()).save(any());
+    }
+
+    @Test
+    void cancelar_citaConResultado_devuelve400() {
+        Cita cita = citaConfirmada();
+        cita.marcarResultado(EstadoCita.ATENDIDA);
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(cita));
+
+        assertThatThrownBy(() -> servicio.cancelar(NEGOCIO_ID, CITA_ID, null, null))
+                .isInstanceOf(PeticionInvalida.class);
+        verify(outboxRepo, never()).save(any());
+    }
+
+    @Test
+    void cancelar_yaCancelada_noEmiteUnSegundoEvento() {
+        stubNegocioYProfesional();
+        Cita cita = citaConfirmada();
+        cita.cancelar();
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(cita));
+
+        var detalle = servicio.cancelar(NEGOCIO_ID, CITA_ID, null, null);
+
+        assertThat(detalle.estado()).isEqualTo("CANCELADA");
+        verify(outboxRepo, never()).save(any());
+    }
+
+    @Test
+    void cancelar_ok_liberaElCupoYEncolaCitasCanceladasPorElNegocio() throws JsonProcessingException {
+        stubNegocioYProfesional();
+        Cita cita = citaConfirmada();
+        when(citaRepo.findByIdAndNegocioId(CITA_ID, NEGOCIO_ID)).thenReturn(Optional.of(cita));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        var detalle = servicio.cancelar(NEGOCIO_ID, CITA_ID, "Incapacidad", "corr-2");
+
+        assertThat(cita.getEstado()).isEqualTo(EstadoCita.CANCELADA);
+        assertThat(detalle.estado()).isEqualTo("CANCELADA");
+        assertThat(detalle.horaLocal()).isEqualTo("10:00");
+        verify(objectMapper).writeValueAsString(argThat((Object e) ->
+                e instanceof EventoCitaCancelada ev && ev.canceladaPor().equals(EventoCitaCancelada.POR_NEGOCIO)));
+        verify(outboxRepo).save(argThat((Outbox o) ->
+                o.getTipoEvento().equals("citas.canceladas")
+                        && o.getClaveParticion().equals(PROFESIONAL_ID.toString())));
     }
 }

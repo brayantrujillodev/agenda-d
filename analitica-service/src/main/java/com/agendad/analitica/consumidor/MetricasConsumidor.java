@@ -62,6 +62,8 @@ public class MetricasConsumidor {
         metricaDiariaRepository.registrarReserva(
                 evento.negocioId(), fecha, evento.profesionalId(), evento.servicioId(), minutos);
         marcarProcesado(evento.eventoId());
+        log.info("citas.reservadas contada en métricas del {}: evento {} cita {} correlationId {}",
+                fecha, evento.eventoId(), evento.citaId(), evento.correlationId());
     }
 
     @KafkaListener(topics = "citas.canceladas", groupId = "analitica-service",
@@ -76,6 +78,8 @@ public class MetricasConsumidor {
         metricaDiariaRepository.registrarCancelacion(
                 evento.negocioId(), fecha, evento.profesionalId(), evento.servicioId(), minutos);
         marcarProcesado(evento.eventoId());
+        log.info("citas.canceladas descontada en métricas del {}: evento {} cita {} correlationId {}",
+                fecha, evento.eventoId(), evento.citaId(), evento.correlationId());
     }
 
     @KafkaListener(topics = "citas.estado", groupId = "analitica-service",
@@ -90,12 +94,14 @@ public class MetricasConsumidor {
         metricaDiariaRepository.registrarAsistencia(
                 evento.negocioId(), fecha, evento.profesionalId(), evento.servicioId(), atendida);
         marcarProcesado(evento.eventoId());
+        log.info("citas.estado {} registrado en métricas del {}: evento {} cita {} correlationId {}",
+                evento.estadoNuevo(), fecha, evento.eventoId(), evento.citaId(), evento.correlationId());
     }
 
     private boolean yaProcesado(UUID eventoId) {
         boolean existe = eventoProcesadoRepository.existsById(eventoId);
         if (existe) {
-            log.debug("Evento {} ya procesado, se ignora (reentrega de Kafka)", eventoId);
+            log.info("Evento {} ya procesado, se ignora (reentrega de Kafka)", eventoId);
         }
         return existe;
     }

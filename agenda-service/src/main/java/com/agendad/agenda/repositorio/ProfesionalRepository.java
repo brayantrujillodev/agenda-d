@@ -13,4 +13,6 @@ public interface ProfesionalRepository extends JpaRepository<Profesional, UUID> 
 
     /** Confirma que el profesional es de ese negocio antes de mostrar su agenda. */
     Optional<Profesional> findByIdAndNegocioId(UUID id, UUID negocioId);
+
+    List<Profesional> findByNegocioIdOrderByNombre(UUID negocioId);
 }

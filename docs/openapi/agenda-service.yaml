@@ -22,6 +22,10 @@ tags:
     description: El cliente opera su propia cita con un token
   - name: Agenda
     description: Jornada del profesional y registro de asistencia
+  - name: Configuración
+    description: |
+      El personal del negocio administra servicios, profesionales, horarios
+      y bloqueos. Lo consume gateway-graphql (mutaciones del panel).
 
 paths:
 
@@ -77,7 +81,9 @@ paths:
         - name: fecha
           in: query
           required: true
-          description: Fecha en hora local del negocio
+          description: |
+            Fecha en hora local del negocio. Desde hoy hasta 60 días
+            adelante; fuera de ese rango responde 400.
           schema:
             type: string
             format: date
@@ -141,6 +147,14 @@ paths:
 
         Reenviar la misma `Idempotency-Key` devuelve la cita original en lugar
         de crear una segunda.
+
+        **Validación estricta (400 `DATOS_INVALIDOS`).** Además del formato de
+        cada campo (ver `ReservaRequest`), `inicio` debe ser un cupo real:
+        en el futuro, a lo sumo 60 días adelante, dentro del horario de
+        atención del profesional, alineado a la grilla de cupos que devuelve
+        `/disponibilidad` y fuera de sus bloqueos. Esto NO valida choques con
+        otras citas: eso sigue siendo trabajo exclusivo del `EXCLUDE`.
+        Campos que no estén en el esquema se rechazan.
       parameters:
         - $ref: '#/components/parameters/Slug'
         - name: Idempotency-Key
@@ -149,6 +163,7 @@ paths:
           description: UUID generado por el cliente antes de enviar
           schema:
             type: string
+            format: uuid
           example: 7d9f2a10-5c31-4e88-b0aa-93c2f1e64d5b
       requestBody:
         required: true
@@ -323,6 +338,297 @@ paths:
         '404':
           $ref: '#/components/responses/NoEncontrado'
 
+  # ---------------------------------------------------------------
+  # 8. GET /v1/citas/{id}
+  # ---------------------------------------------------------------
+  /v1/citas/{id}:
+    get:
+      tags: [Agenda]
+      summary: Detalle de una cita del negocio
+      description: |
+        Solo devuelve citas del negocio de `X-Negocio-Id`. El celular viaja
+        completo: lo pide el propio negocio.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - $ref: '#/components/parameters/CitaId'
+      responses:
+        '200':
+          description: La cita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitaDetalle'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 9. POST /v1/citas/{id}/cancelacion
+  # ---------------------------------------------------------------
+  /v1/citas/{id}/cancelacion:
+    post:
+      tags: [Agenda]
+      summary: El negocio cancela una cita
+      description: |
+        Libera el cupo y publica `citas.canceladas` con
+        `canceladaPor: NEGOCIO` por outbox, que dispara el aviso al cliente.
+        Cancelar una cita ya cancelada no emite un segundo evento.
+        No se puede cancelar una cita que ya tiene resultado.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - $ref: '#/components/parameters/CitaId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                motivo:
+                  type: string
+                  maxLength: 200
+            example:
+              motivo: El profesional se incapacitó
+      responses:
+        '200':
+          description: Cita cancelada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitaDetalle'
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 10. GET /v1/negocio
+  # ---------------------------------------------------------------
+  /v1/negocio:
+    get:
+      tags: [Configuración]
+      summary: Configuración completa del negocio
+      description: |
+        Negocio, todos sus servicios (activos e inactivos) y sus
+        profesionales con los servicios que prestan y su horario semanal.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+      responses:
+        '200':
+          description: Configuración del negocio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NegocioConfig'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 11. POST /v1/servicios
+  # ---------------------------------------------------------------
+  /v1/servicios:
+    post:
+      tags: [Configuración]
+      summary: Crear un servicio
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicioRequest'
+      responses:
+        '201':
+          description: Servicio creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioAdmin'
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+
+  # ---------------------------------------------------------------
+  # 12. PUT / DELETE /v1/servicios/{id}
+  # ---------------------------------------------------------------
+  /v1/servicios/{id}:
+    put:
+      tags: [Configuración]
+      summary: Actualizar un servicio
+      description: |
+        Cambiar la duración no mueve las citas ya reservadas: aplica a las
+        reservas nuevas.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - $ref: '#/components/parameters/ServicioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicioRequest'
+      responses:
+        '200':
+          description: Servicio actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioAdmin'
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    delete:
+      tags: [Configuración]
+      summary: Desactivar un servicio
+      description: |
+        Borrado lógico (`activo = false`): deja de ofrecerse en la ruta
+        pública, pero las citas que ya lo usan conservan su referencia.
+        Desactivar uno ya inactivo no es un error.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - $ref: '#/components/parameters/ServicioId'
+      responses:
+        '204':
+          description: Servicio desactivado
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 13. POST /v1/profesionales
+  # ---------------------------------------------------------------
+  /v1/profesionales:
+    post:
+      tags: [Configuración]
+      summary: Crear un profesional
+      description: |
+        Nace activo y sin horario: no tiene cupos hasta que se le defina
+        uno con `PUT /v1/profesionales/{id}/horarios`.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfesionalRequest'
+      responses:
+        '201':
+          description: Profesional creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfesionalAdmin'
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 14. PUT /v1/profesionales/{id}/horarios
+  # ---------------------------------------------------------------
+  /v1/profesionales/{id}/horarios:
+    put:
+      tags: [Configuración]
+      summary: Reemplazar el horario semanal del profesional
+      description: |
+        Reemplaza TODAS las franjas del profesional por las enviadas. Horas
+        en hora local del negocio (`HH:mm`). Dos franjas del mismo día no
+        pueden cruzarse. Una lista vacía deja al profesional sin cupos.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - $ref: '#/components/parameters/ProfesionalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              maxItems: 21
+              items:
+                $ref: '#/components/schemas/Horario'
+            example:
+              - diaSemana: 1
+                horaInicio: '08:00'
+                horaFin: '12:00'
+              - diaSemana: 1
+                horaInicio: '14:00'
+                horaFin: '18:00'
+      responses:
+        '200':
+          description: Horario guardado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfesionalAdmin'
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 15. GET /v1/profesionales/{id}/bloqueos
+  # ---------------------------------------------------------------
+  /v1/profesionales/{id}/bloqueos:
+    get:
+      tags: [Configuración]
+      summary: Bloqueos vigentes del profesional
+      description: Los que aún no terminan (`fin` posterior a ahora), ordenados por inicio.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+        - $ref: '#/components/parameters/ProfesionalId'
+      responses:
+        '200':
+          description: Bloqueos vigentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bloqueo'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+  # ---------------------------------------------------------------
+  # 16. POST /v1/bloqueos
+  # ---------------------------------------------------------------
+  /v1/bloqueos:
+    post:
+      tags: [Configuración]
+      summary: Bloquear un rango del profesional
+      description: |
+        Vacaciones, incapacidad, festivo. Falla con 409 `CITAS_EN_RANGO` si
+        hay citas confirmadas dentro del rango: el sistema no desagenda
+        clientes por su cuenta; primero hay que cancelarlas.
+      parameters:
+        - $ref: '#/components/parameters/NegocioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloqueoRequest'
+      responses:
+        '201':
+          description: Bloqueo creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bloqueo'
+        '400':
+          $ref: '#/components/responses/PeticionInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: Hay citas confirmadas dentro del rango
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: CITAS_EN_RANGO
+                mensaje: Hay 2 citas confirmadas en ese rango. Cancélalas antes de bloquearlo.
+
 # ===================================================================
 # GET /v1/metricas vive en analitica-service (docs/openapi/analitica-service.yaml),
 # no aquí. Este servicio no calcula indicadores agregados.
@@ -362,7 +668,196 @@ components:
       schema:
         type: string
 
+    CitaId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ServicioId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ProfesionalId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
   schemas:
+
+    ServicioAdmin:
+      description: Servicio visto por el propio negocio (incluye los inactivos).
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        duracionMin:
+          type: integer
+        precio:
+          type: number
+        activo:
+          type: boolean
+
+    ServicioRequest:
+      type: object
+      required: [nombre, duracionMin, precio]
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 80
+        duracionMin:
+          type: integer
+          minimum: 5
+          maximum: 480
+          description: Múltiplo de 5. Fija el tamaño del cupo.
+        precio:
+          type: number
+          minimum: 0
+          maximum: 10000000
+      example:
+        nombre: Corte y barba
+        duracionMin: 90
+        precio: 35000
+
+    Horario:
+      type: object
+      required: [diaSemana, horaInicio, horaFin]
+      additionalProperties: false
+      properties:
+        diaSemana:
+          type: integer
+          minimum: 1
+          maximum: 7
+          description: 1 = lunes ... 7 = domingo (ISO-8601)
+        horaInicio:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Hora local del negocio
+          example: '08:00'
+        horaFin:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: Posterior a horaInicio
+          example: '18:00'
+
+    ProfesionalRequest:
+      type: object
+      required: [nombre, serviciosIds]
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 80
+        serviciosIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          description: Servicios activos del mismo negocio
+      example:
+        nombre: Camila
+        serviciosIds: ['22222222-2222-2222-2222-222222222222']
+
+    ProfesionalAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        activo:
+          type: boolean
+        serviciosIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        horarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Horario'
+
+    NegocioConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        slugPublico:
+          type: string
+        zonaHoraria:
+          type: string
+          example: America/Bogota
+        servicios:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServicioAdmin'
+        profesionales:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfesionalAdmin'
+
+    BloqueoRequest:
+      type: object
+      required: [profesionalId, inicio, fin]
+      additionalProperties: false
+      properties:
+        profesionalId:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+          description: En UTC
+        fin:
+          type: string
+          format: date-time
+          description: En UTC. Posterior a inicio; a lo sumo 366 días después.
+        motivo:
+          type: string
+          maxLength: 200
+      example:
+        profesionalId: 33333333-3333-3333-3333-333333333333
+        inicio: '2026-12-24T13:00:00Z'
+        fin: '2026-12-26T23:00:00Z'
+        motivo: Vacaciones de fin de año
+
+    Bloqueo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        profesionalId:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+        fin:
+          type: string
+          format: date-time
+        motivo:
+          type: string
 
     Servicio:
       type: object
@@ -400,6 +895,7 @@ components:
     ReservaRequest:
       type: object
       required: [servicioId, profesionalId, inicio, clienteNombre, clienteCelular]
+      additionalProperties: false
       properties:
         servicioId:
           type: string
@@ -410,14 +906,24 @@ components:
         inicio:
           type: string
           format: date-time
-          description: En UTC. El fin se calcula con la duración del servicio.
+          description: |
+            En UTC. Debe ser uno de los cupos que devuelve `/disponibilidad`.
+            El fin se calcula con la duración del servicio.
         clienteNombre:
           type: string
-          minLength: 2
-          maxLength: 120
+          minLength: 5
+          maxLength: 80
+          pattern: "^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:['-][A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*){1,5}$"  # yamllint disable-line rule:line-length
+          description: |
+            Nombre y apellido: de 2 a 6 palabras, solo letras (con tildes y
+            ñ), apóstrofo o guion dentro de una palabra. Sin números ni
+            símbolos. Los espacios de sobra se recortan antes de validar.
+          example: Juan Pérez
         clienteCelular:
           type: string
-          pattern: '^[0-9]{10}$'
+          pattern: '^3[0-9]{9}$'
+          description: Celular colombiano, 10 dígitos que empiezan por 3. Sin espacios ni prefijo +57.
+          example: '3001234567'
 
     CitaCreada:
       type: object
@@ -457,8 +963,14 @@ components:
           format: date-time
         horaLocal:
           type: string
+        servicioId:
+          type: string
+          format: uuid
         servicioNombre:
           type: string
+        profesionalId:
+          type: string
+          format: uuid
         profesionalNombre:
           type: string
         clienteNombre:

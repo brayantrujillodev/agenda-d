@@ -40,6 +40,15 @@ public class HorarioAtencion {
     protected HorarioAtencion() {
     }
 
+    public HorarioAtencion(UUID negocioId, UUID profesionalId, short diaSemana,
+                           LocalTime horaInicio, LocalTime horaFin) {
+        this.negocioId = negocioId;
+        this.profesionalId = profesionalId;
+        this.diaSemana = diaSemana;
+        this.horaInicio = horaInicio;
+        this.horaFin = horaFin;
+    }
+
     public UUID getId() {
         return id;
     }

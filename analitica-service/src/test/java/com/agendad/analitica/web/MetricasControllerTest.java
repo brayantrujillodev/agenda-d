@@ -3,9 +3,11 @@ package com.agendad.analitica.web;
 import com.agendad.analitica.comun.error.PeticionInvalida;
 import com.agendad.analitica.repositorio.AgregadoMetricas;
 import com.agendad.analitica.repositorio.MetricaDiariaRepository;
+import com.agendad.analitica.web.dto.ConteoServicioResponse;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +40,21 @@ class MetricasControllerTest {
         assertThat(resultado.noAsistio()).isEqualTo(2);
         assertThat(resultado.ocupacion()).isEqualTo(50.0);
         assertThat(resultado.tasaInasistencia()).isEqualTo(25.0);
+    }
+
+    @Test
+    void devuelveLosServiciosMasReservadosPorId() {
+        UUID negocioId = UUID.randomUUID();
+        UUID corte = UUID.randomUUID();
+        LocalDate desde = LocalDate.of(2026, 9, 1);
+        LocalDate hasta = LocalDate.of(2026, 9, 30);
+        when(repositorio.agregarPeriodo(negocioId, desde, hasta)).thenReturn(AgregadoMetricas.vacio());
+        when(repositorio.topServicios(negocioId, desde, hasta, 5))
+                .thenReturn(List.of(new ConteoServicioResponse(corte, 12)));
+
+        var resultado = controller.metricas(negocioId, desde, hasta);
+
+        assertThat(resultado.topServicios()).containsExactly(new ConteoServicioResponse(corte, 12));
     }
 
     @Test

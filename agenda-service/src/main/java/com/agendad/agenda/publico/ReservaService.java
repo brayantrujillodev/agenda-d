@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,10 @@ public class ReservaService {
     private static final int INTENTOS_ANTE_DEADLOCK = 8;
     private static final int ESPERA_MAXIMA_MS = 25;
     private static final DateTimeFormatter HORA_LOCAL = DateTimeFormatter.ofPattern("HH:mm");
+    private static final Pattern UUID_CANONICO =
+            Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+    /** El correlationId viaja a logs y a Kafka: solo se acepta si es corto y sin caracteres raros. */
+    private static final Pattern CORRELACION_SEGURA = Pattern.compile("^[A-Za-z0-9._-]{1,64}$");
 
     private final NegocioRepository negocioRepo;
     private final ServicioRepository servicioRepo;
@@ -52,6 +57,7 @@ public class ReservaService {
     private final TokenGestionRepository tokenRepo;
     private final DisponibilidadService disponibilidadService;
     private final PersistenciaReserva persistencia;
+    private final ValidadorCupo validadorCupo;
     private final String gestionBaseUrl;
 
     public ReservaService(NegocioRepository negocioRepo,
@@ -61,6 +67,7 @@ public class ReservaService {
                           TokenGestionRepository tokenRepo,
                           DisponibilidadService disponibilidadService,
                           PersistenciaReserva persistencia,
+                          ValidadorCupo validadorCupo,
                           @Value("${agendad.gestion.base-url}") String gestionBaseUrl) {
         this.negocioRepo = negocioRepo;
         this.servicioRepo = servicioRepo;
@@ -69,6 +76,7 @@ public class ReservaService {
         this.tokenRepo = tokenRepo;
         this.disponibilidadService = disponibilidadService;
         this.persistencia = persistencia;
+        this.validadorCupo = validadorCupo;
         this.gestionBaseUrl = gestionBaseUrl;
     }
 
@@ -76,6 +84,9 @@ public class ReservaService {
                                        String correlationId, ReservaRequest peticion) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new PeticionInvalida("Falta la cabecera Idempotency-Key.");
+        }
+        if (!UUID_CANONICO.matcher(idempotencyKey).matches()) {
+            throw new PeticionInvalida("La cabecera Idempotency-Key debe ser un UUID.");
         }
 
         Negocio negocio = negocioRepo.findBySlugPublico(slug)
@@ -104,11 +115,12 @@ public class ReservaService {
 
         ZoneId zona = ZoneId.of(negocio.getZonaHoraria());
         Instant inicio = peticion.inicio();
+        validadorCupo.validarCupo(profesional.getId(), inicio, servicio.getDuracionMin(), zona);
         Instant fin = inicio.plus(Duration.ofMinutes(servicio.getDuracionMin()));
 
         var datos = new PersistenciaReserva.Datos(
                 negocio.getId(), servicio.getId(), profesional.getId(), inicio, fin,
-                peticion.clienteNombre().trim(), peticion.clienteCelular(), idempotencyKey,
+                peticion.clienteNombre(), peticion.clienteCelular(), idempotencyKey,
                 servicio.getNombre(), profesional.getNombre(), negocio.getZonaHoraria(),
                 correlacion(correlationId));
 
@@ -205,7 +217,8 @@ public class ReservaService {
     }
 
     private static String correlacion(String recibida) {
-        return (recibida == null || recibida.isBlank()) ? UUID.randomUUID().toString() : recibida;
+        return (recibida != null && CORRELACION_SEGURA.matcher(recibida).matches())
+                ? recibida : UUID.randomUUID().toString();
     }
 
     private static String horaLocal(Instant instante, ZoneId zona) {

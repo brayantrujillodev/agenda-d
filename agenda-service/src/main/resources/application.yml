@@ -52,6 +52,11 @@ spring:
   jackson:
     # Las respuestas del contrato no muestran campos nulos.
     default-property-inclusion: non_null
+    # Entrada estricta: un campo que no está en el contrato es un error, no
+    # se ignora en silencio. Número → texto lo bloquea comun/JacksonEstricto.
+    # Ver ManejadorErrores#cuerpoIlegible.
+    deserialization:
+      fail-on-unknown-properties: true
 
 management:
   endpoints:
@@ -68,6 +73,10 @@ springdoc:
     path: /swagger-ui.html
 
 agendad:
+  reserva:
+    # Horizonte de reserva: hasta cuántos días adelante se puede consultar
+    # disponibilidad y reservar (ValidadorCupo). web/app.js usa el mismo valor.
+    dias-maximos: ${AGENDAD_RESERVA_DIAS_MAXIMOS:60}
   gestion:
     # Base para armar el enlace de gestión que se devuelve al reservar.
     base-url: ${AGENDAD_GESTION_BASE_URL:http://localhost:8081}

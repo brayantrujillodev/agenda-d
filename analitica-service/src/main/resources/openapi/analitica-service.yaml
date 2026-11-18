@@ -18,9 +18,12 @@ info:
     (configurable, por defecto 600 = jornada 08:00–18:00). Calcularla contra
     el horario de atención real de cada profesional requeriría leer
     `agenda.horario_atencion`, que vive en otro esquema — este servicio no
-    tiene llaves foráneas a él por diseño (ver CLAUDE.md). `topServicios`
-    devuelve una lista vacía por la misma razón: `analitica.metrica_diaria`
-    solo guarda el `servicioId`, no su nombre.
+    tiene llaves foráneas a él por diseño (ver CLAUDE.md).
+
+    `topServicios` devuelve el `servicioId`, no el nombre:
+    `analitica.metrica_diaria` no conoce los nombres, que viven en
+    agenda-service. Ponerle nombre es trabajo del gateway GraphQL, que es
+    quien compone datos de los dos servicios.
 
 servers:
   - url: http://localhost:8083
@@ -74,7 +77,7 @@ paths:
                 ocupacion: 72.5
                 tasaInasistencia: 9.8
                 topServicios:
-                  - servicio: Corte de cabello
+                  - servicioId: 22222222-2222-2222-2222-222222222222
                     cantidad: 120
         '400':
           description: Rango de fechas inválido
@@ -132,10 +135,13 @@ components:
           items:
             type: object
             properties:
-              servicio:
+              servicioId:
                 type: string
+                format: uuid
               cantidad:
                 type: integer
+                description: Reservas del servicio en el periodo
+          description: Hasta 5, de más a menos reservado
 
     Error:
       type: object

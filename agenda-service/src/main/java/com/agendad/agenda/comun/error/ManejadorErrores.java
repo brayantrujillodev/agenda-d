@@ -1,5 +1,7 @@
 package com.agendad.agenda.comun.error;
 
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import java.time.DateTimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,13 @@ public class ManejadorErrores {
                 .body(new ConflictoCupoResponse("CUPO_OCUPADO", e.getMessage(), e.getAlternativas()));
     }
 
+    /** Regla de negocio que impide la operación (p. ej. CITAS_EN_RANGO al bloquear). */
+    @ExceptionHandler(Conflicto.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public RespuestaError conflicto(Conflicto e) {
+        return new RespuestaError(e.getCodigo(), e.getMessage());
+    }
+
     /** Falla la validación del cuerpo (@Valid): se muestra el primer mensaje, ya redactado en español. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -61,6 +70,20 @@ public class ManejadorErrores {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public RespuestaError cuerpoIlegible(HttpMessageNotReadableException e) {
+        // Con fail-on-unknown-properties y sin coerción de escalares
+        // (application.yml), Jackson rechaza campos de más y tipos cambiados:
+        // se nombra el campo para que quien llama sepa qué corregir.
+        if (e.getCause() instanceof UnrecognizedPropertyException u) {
+            return new RespuestaError("DATOS_INVALIDOS",
+                    "El campo '" + u.getPropertyName() + "' no se permite en esta petición.");
+        }
+        if (e.getCause() instanceof MismatchedInputException m && !m.getPath().isEmpty()) {
+            String campo = m.getPath().get(m.getPath().size() - 1).getFieldName();
+            if (campo != null) {
+                return new RespuestaError("DATOS_INVALIDOS",
+                        "El campo '" + campo + "' tiene un formato o tipo inválido.");
+            }
+        }
         return new RespuestaError("DATOS_INVALIDOS", "El cuerpo de la petición no es un JSON válido.");
     }
 

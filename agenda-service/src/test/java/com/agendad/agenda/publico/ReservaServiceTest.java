@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -41,7 +42,7 @@ import org.junit.jupiter.api.Test;
 class ReservaServiceTest {
 
     private static final String SLUG = "barberia-el-corte";
-    private static final String IDEM = "idem-1";
+    private static final String IDEM = "7d9f2a10-5c31-4e88-b0aa-93c2f1e64d5b";
     private static final Instant INICIO = Instant.parse("2026-09-01T15:00:00Z"); // 10:00 en Bogotá
     private static final UUID NEGOCIO_ID = UUID.randomUUID();
     private static final UUID SERVICIO_ID = UUID.randomUUID();
@@ -54,10 +55,11 @@ class ReservaServiceTest {
     private final TokenGestionRepository tokenRepo = mock(TokenGestionRepository.class);
     private final DisponibilidadService disponibilidadService = mock(DisponibilidadService.class);
     private final PersistenciaReserva persistencia = mock(PersistenciaReserva.class);
+    private final ValidadorCupo validadorCupo = mock(ValidadorCupo.class);
 
     private final ReservaService servicio = new ReservaService(
             negocioRepo, servicioRepo, profesionalRepo, citaRepo, tokenRepo,
-            disponibilidadService, persistencia, "http://localhost:8081");
+            disponibilidadService, persistencia, validadorCupo, "http://localhost:8081");
 
     private Negocio negocio;
     private Servicio servicioBarberia;
@@ -115,6 +117,25 @@ class ReservaServiceTest {
         assertThatThrownBy(() -> servicio.reservar(SLUG, "  ", null, peticion()))
                 .isInstanceOf(PeticionInvalida.class)
                 .hasMessageContaining("Idempotency-Key");
+    }
+
+    @Test
+    void idempotencyKeyQueNoEsUuid_devuelve400SinTocarLaBase() {
+        assertThatThrownBy(() -> servicio.reservar(SLUG, "idem-1", null, peticion()))
+                .isInstanceOf(PeticionInvalida.class)
+                .hasMessageContaining("debe ser un UUID");
+        verifyNoInteractions(persistencia);
+    }
+
+    @Test
+    void cupoFueraDeLaConfiguracionDelNegocio_noLlegaAlInsert() {
+        doThrow(new PeticionInvalida("Esa hora no es un cupo de este profesional."))
+                .when(validadorCupo).validarCupo(eq(PROFESIONAL_ID), eq(INICIO), eq(60), any());
+
+        assertThatThrownBy(() -> servicio.reservar(SLUG, IDEM, null, peticion()))
+                .isInstanceOf(PeticionInvalida.class)
+                .hasMessageContaining("no es un cupo");
+        verifyNoInteractions(persistencia);
     }
 
     @Test
