@@ -113,6 +113,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: agenda-d
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       DYNAMIC_CONFIG_ENABLED: "true"
+      LOGGING_LEVEL_ROOT: INFO
+      LOGGING_LEVEL_COM_PROVECTUS: INFO
     ports:
       - "8090:8080"
     depends_on:
@@ -163,6 +165,8 @@ services:
       SPRING_DATASOURCE_USERNAME: agendad
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
+      LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
       - "8081:8081"          # la ruta pública del cliente entra por aquí
@@ -188,6 +192,8 @@ services:
       SPRING_DATASOURCE_USERNAME: agendad
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
+      LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
       # REGISTRO = guarda el mensaje en BD en vez de enviarlo. Sin costo.
       AGENDAD_CANAL_POR_DEFECTO: REGISTRO
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
@@ -234,6 +240,8 @@ services:
       SPRING_DATASOURCE_USERNAME: agendad
       SPRING_DATASOURCE_PASSWORD: agendad
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
+      LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     ports:
       - "8083:8083"

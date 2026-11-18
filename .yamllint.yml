@@ -6,6 +6,7 @@ extends: default
 ignore: |
   **/target/**
   **/node_modules/**
+  .postman/
 
 rules:
   # Las líneas de listeners de Kafka son largas por naturaleza.
