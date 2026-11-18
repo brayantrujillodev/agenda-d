@@ -42,4 +42,18 @@ public interface CitaRepository extends JpaRepository<Cita, UUID> {
             @Param("cancelada") EstadoCita cancelada,
             @Param("inicioVentana") Instant inicioVentana,
             @Param("finVentana") Instant finVentana);
+
+    /** Citas confirmadas del profesional que se cruzan con [inicio, fin): impiden crear un bloqueo. */
+    @Query("""
+            SELECT COUNT(c) FROM Cita c
+            WHERE c.profesionalId = :profesionalId
+              AND c.estado = :confirmada
+              AND c.inicio < :fin
+              AND c.fin > :inicio
+            """)
+    long contarConfirmadasEnRango(
+            @Param("profesionalId") UUID profesionalId,
+            @Param("confirmada") EstadoCita confirmada,
+            @Param("inicio") Instant inicio,
+            @Param("fin") Instant fin);
 }

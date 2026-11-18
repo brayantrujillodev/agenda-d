@@ -15,4 +15,8 @@ public interface BloqueoRepository extends JpaRepository<Bloqueo, UUID> {
      */
     List<Bloqueo> findByProfesionalIdInAndInicioLessThanAndFinGreaterThan(
             Collection<UUID> profesionalIds, Instant finVentana, Instant inicioVentana);
+
+    /** Bloqueos que aún no terminan, del más próximo al más lejano. */
+    List<Bloqueo> findByNegocioIdAndProfesionalIdAndFinGreaterThanOrderByInicio(
+            UUID negocioId, UUID profesionalId, Instant ahora);
 }

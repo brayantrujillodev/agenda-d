@@ -12,11 +12,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
 public class MetricasController {
+
+    private static final int TOP_SERVICIOS = 5;
 
     private final MetricaDiariaRepository metricaDiariaRepository;
     private final long minutosHabilesDia;
@@ -53,7 +54,7 @@ public class MetricasController {
                 desde, hasta,
                 agregado.reservadas(), agregado.atendidas(), agregado.noAsistio(), agregado.canceladas(),
                 redondear(ocupacion), redondear(tasaInasistencia),
-                List.of()); // topServicios: ver nota en ConteoServicioResponse
+                metricaDiariaRepository.topServicios(negocioId, desde, hasta, TOP_SERVICIOS));
     }
 
     private double porcentaje(long parte, long total) {

@@ -1,0 +1,35 @@
+AGENDA-D · mvn -B verify por servicio · 2026-11-18T17:59Z
+Entorno: maven:3.9-eclipse-temurin-21 en Docker 29.8 (Windows 11), Testcontainers 1.21.4, Postgres y Kafka reales
+
+=== agenda-service ===
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.853 s -- in com.agendad.agenda.administracion.AgendaServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 38.81 s -- in com.agendad.agenda.administracion.SeparacionEntreNegociosTest
+[INFO] Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.598 s -- in com.agendad.agenda.configuracion.ConfiguracionServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.561 s -- in com.agendad.agenda.gestion.GestionServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.222 s -- in com.agendad.agenda.outbox.OutboxRelayTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.088 s -- in com.agendad.agenda.publico.DisponibilidadServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.464 s -- in com.agendad.agenda.publico.dto.ReservaRequestValidacionTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 13.45 s -- in com.agendad.agenda.publico.ReservaConcurrenciaTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.397 s -- in com.agendad.agenda.publico.ReservaServiceTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.250 s -- in com.agendad.agenda.publico.ValidadorCupoTest
+[INFO] Tests run: 70, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+
+=== notificaciones-service ===
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.362 s -- in co.edu.fet.agendad.notificaciones.consumidor.CitasEventoConsumidorTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 s -- in co.edu.fet.agendad.notificaciones.consumidor.RecordatorioSchedulerTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+
+=== analitica-service ===
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.094 s -- in com.agendad.analitica.consumidor.MetricasConsumidorTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.653 s -- in com.agendad.analitica.web.MetricasControllerTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+
+=== gateway-graphql ===
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.907 s -- in com.agendad.gateway.client.ClientesHttpTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.190 s -- in com.agendad.gateway.config.LimitePeticionesFilterTest
+[INFO] Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 34.89 s -- in com.agendad.gateway.web.GatewayGraphqlTest
+[INFO] Tests run: 30, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS

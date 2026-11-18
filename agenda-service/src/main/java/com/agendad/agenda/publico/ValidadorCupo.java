@@ -62,6 +62,11 @@ public class ValidadorCupo {
         }
     }
 
+    /** Un cupo solo se ofrece si su inicio es posterior al instante actual. */
+    public boolean esFuturo(Instant inicio) {
+        return inicio.isAfter(reloj.instant());
+    }
+
     public void validarCupo(UUID profesionalId, Instant inicio, int duracionMin, ZoneId zona) {
         if (!inicio.isAfter(reloj.instant())) {
             throw new PeticionInvalida("Esa hora ya pasó. Elige uno de los cupos disponibles.");

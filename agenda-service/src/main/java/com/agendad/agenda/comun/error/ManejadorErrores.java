@@ -48,6 +48,13 @@ public class ManejadorErrores {
                 .body(new ConflictoCupoResponse("CUPO_OCUPADO", e.getMessage(), e.getAlternativas()));
     }
 
+    /** Regla de negocio que impide la operación (p. ej. CITAS_EN_RANGO al bloquear). */
+    @ExceptionHandler(Conflicto.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public RespuestaError conflicto(Conflicto e) {
+        return new RespuestaError(e.getCodigo(), e.getMessage());
+    }
+
     /** Falla la validación del cuerpo (@Valid): se muestra el primer mensaje, ya redactado en español. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

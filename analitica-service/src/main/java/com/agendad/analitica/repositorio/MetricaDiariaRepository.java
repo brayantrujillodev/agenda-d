@@ -1,9 +1,11 @@
 package com.agendad.analitica.repositorio;
 
+import com.agendad.analitica.web.dto.ConteoServicioResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -56,6 +58,22 @@ public class MetricaDiariaRepository {
                 DO UPDATE SET atendidas = analitica.metrica_diaria.atendidas + EXCLUDED.atendidas,
                               no_asistio = analitica.metrica_diaria.no_asistio + EXCLUDED.no_asistio
                 """, negocioId, fecha, profesionalId, servicioId, incrementoAtendidas, incrementoNoAsistio);
+    }
+
+    /** Los servicios más reservados del periodo, de más a menos. Empate: por id, para que sea estable. */
+    public List<ConteoServicioResponse> topServicios(UUID negocioId, LocalDate desde, LocalDate hasta, int limite) {
+        return jdbc.query("""
+                SELECT servicio_id, SUM(reservadas) AS cantidad
+                FROM analitica.metrica_diaria
+                WHERE negocio_id = ? AND fecha BETWEEN ? AND ?
+                GROUP BY servicio_id
+                HAVING SUM(reservadas) > 0
+                ORDER BY cantidad DESC, servicio_id
+                LIMIT ?
+                """,
+                (rs, rowNum) -> new ConteoServicioResponse(
+                        rs.getObject("servicio_id", UUID.class), rs.getLong("cantidad")),
+                negocioId, desde, hasta, limite);
     }
 
     public AgregadoMetricas agregarPeriodo(UUID negocioId, LocalDate desde, LocalDate hasta) {

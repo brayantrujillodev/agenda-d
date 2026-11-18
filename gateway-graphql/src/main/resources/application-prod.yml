@@ -1,0 +1,10 @@
+# Perfil de despliegue (docker-compose.prod.yml activa SPRING_PROFILES_ACTIVE=prod).
+# Sin introspección ni GraphiQL: el esquema no se publica a cualquiera que
+# llegue a /graphql. El contrato sigue en docs/graphql/schema.graphqls.
+spring:
+  graphql:
+    graphiql:
+      enabled: false
+    schema:
+      introspection:
+        enabled: false

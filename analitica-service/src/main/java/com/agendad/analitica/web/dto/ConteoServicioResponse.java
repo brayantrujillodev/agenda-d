@@ -1,10 +1,12 @@
 package com.agendad.analitica.web.dto;
 
+import java.util.UUID;
+
 /**
- * Reservado para cuando se resuelva el nombre real del servicio: analitica.*
- * solo guarda servicioId (sin FK a agenda.servicio, esquemas independientes
- * por diseño — ver CLAUDE.md). Hasta entonces, GET /v1/metricas devuelve
- * topServicios vacío en vez de mostrar un UUID donde se espera un nombre.
+ * Reservas de un servicio en el periodo. Va el {@code servicioId}, no el
+ * nombre: analitica.* no conoce los nombres (viven en agenda.servicio, otro
+ * esquema y sin FK por diseño — ver CLAUDE.md). Ponerle nombre lo hace
+ * gateway-graphql, que es quien compone datos de los dos servicios.
  */
-public record ConteoServicioResponse(String servicio, int cantidad) {
+public record ConteoServicioResponse(UUID servicioId, long cantidad) {
 }

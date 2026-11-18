@@ -33,6 +33,27 @@ public class Servicio {
     protected Servicio() {
     }
 
+    /** Servicio nuevo del negocio. Nace activo. */
+    public Servicio(UUID negocioId, String nombre, int duracionMin, BigDecimal precio) {
+        this.negocioId = negocioId;
+        this.nombre = nombre;
+        this.duracionMin = duracionMin;
+        this.precio = precio;
+        this.activo = true;
+    }
+
+    /** Cambiar la duración no mueve citas ya reservadas: aplica a las reservas nuevas. */
+    public void actualizar(String nombre, int duracionMin, BigDecimal precio) {
+        this.nombre = nombre;
+        this.duracionMin = duracionMin;
+        this.precio = precio;
+    }
+
+    /** Borrado lógico: las citas que ya lo usan conservan la referencia. */
+    public void desactivar() {
+        this.activo = false;
+    }
+
     public UUID getId() {
         return id;
     }

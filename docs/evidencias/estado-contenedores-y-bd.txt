@@ -1,0 +1,52 @@
+# Estado de los contenedores y de la base de datos · 2026-11-18T19:00Z
+
+## docker compose --profile full ps
+NAME                 STATUS                       PORTS
+agd-agenda           Up 3 minutes (healthy)       0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
+agd-analitica        Up About an hour (healthy)   0.0.0.0:8083->8083/tcp, [::]:8083->8083/tcp
+agd-gateway          Up About an hour (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+agd-kafka            Up 2 hours (healthy)         0.0.0.0:29092->29092/tcp, [::]:29092->29092/tcp
+agd-kafka-ui         Up About an hour             0.0.0.0:8090->8080/tcp, [::]:8090->8080/tcp
+agd-notificaciones   Up About an hour             0.0.0.0:8082->8082/tcp, [::]:8082->8082/tcp
+agd-pgadmin          Up 2 hours                   0.0.0.0:5050->80/tcp, [::]:5050->80/tcp
+agd-postgres         Up 2 hours (healthy)         0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+
+## Restricción EXCLUDE en PostgreSQL
+     conname     |                                                          definicion                                                          
+-----------------+------------------------------------------------------------------------------------------------------------------------------
+ cita_sin_solape | EXCLUDE USING gist (profesional_id WITH =, tstzrange(inicio, fin, '[)'::text) WITH &&) WHERE ((estado <> 'CANCELADA'::text))
+(1 row)
+
+## Tablas
+  table_schema  |      table_name       
+----------------+-----------------------
+ agenda         | bloqueo
+ agenda         | cita
+ agenda         | flyway_schema_history
+ agenda         | horario_atencion
+ agenda         | negocio
+ agenda         | outbox
+ agenda         | profesional
+ agenda         | servicio
+ agenda         | servicio_profesional
+ agenda         | token_gestion
+ analitica      | evento_procesado
+ analitica      | metrica_diaria
+ notificaciones | evento_procesado
+ notificaciones | mensaje_fallido
+ notificaciones | programacion
+(15 rows)
+
+## Outbox: eventos publicados (enviado_en no nulo) y pendientes
+ enviados | pendientes 
+----------+------------
+       13 |          0
+(1 row)
+
+   tipo_evento    | enviado | intentos |           creado_en           
+------------------+---------+----------+-------------------------------
+ citas.reservadas | t       |        0 | 2026-11-18 18:57:25.165195+00
+ citas.estado     | t       |        0 | 2026-11-18 17:38:26.67273+00
+ citas.reservadas | t       |        0 | 2026-11-18 17:38:24.163893+00
+(3 rows)
+

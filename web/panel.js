@@ -24,6 +24,7 @@
           clienteNombre
           clienteCelular
           servicio { nombre }
+          profesional { nombre }
           estado
         }
         metricasDelMes {
@@ -43,14 +44,20 @@
   async function consultarPanel(fecha) {
     const res = await fetch(CFG.gatewayUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Sin autenticación (CLAUDE.md, regla 4): el negocio viaja en la cabecera.
+      headers: { 'Content-Type': 'application/json', 'X-Negocio-Id': CFG.negocioId },
       body: JSON.stringify({ query: QUERY, variables: { fecha } }),
     });
     const cuerpo = await res.json();
-    if (cuerpo.errors && cuerpo.errors.length) {
-      throw new Error(cuerpo.errors.map((e) => e.message).join('; '));
+    const errores = (cuerpo.errors || []).map((e) => e.message);
+    const datos = cuerpo.data && cuerpo.data.panelRecepcion;
+    if (!datos) {
+      throw new Error(errores.join(' ') || 'El gateway no devolvió el panel.');
     }
-    return cuerpo.data.panelRecepcion;
+    // Respuesta parcial: si analitica-service no responde, metricasDelMes
+    // llega en null y el motivo en errors[]. La agenda se muestra igual.
+    datos.avisos = errores;
+    return datos;
   }
 
   /** No es crítico: si notificaciones-service no responde, el panel igual funciona. */
@@ -97,16 +104,21 @@
         <td>${escapar(c.horaLocal)}</td>
         <td>${escapar(c.clienteNombre)}</td>
         <td>${escapar(c.servicio.nombre)}</td>
+        <td>${escapar(c.profesional.nombre)}</td>
         <td><span class="panel-chip panel-chip--${c.estado.toLowerCase()}">${escapar(ESTADO_ETIQUETA[c.estado] || c.estado)}</span></td>
       </tr>`).join('');
     return `
       <table class="panel-tabla">
-        <thead><tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Profesional</th><th>Estado</th></tr></thead>
         <tbody>${filas}</tbody>
       </table>`;
   }
 
-  function pintarMetricas(m) {
+  function pintarMetricas(m, avisos) {
+    if (!m) {
+      const motivo = avisos && avisos.length ? avisos.join(' ') : 'Intenta de nuevo en un momento.';
+      return `<p class="cupos__error">No pudimos cargar los indicadores. ${escapar(motivo)}</p>`;
+    }
     const tile = (valor, etiqueta) => `
       <div class="panel-metrica">
         <span class="panel-metrica__valor">${escapar(valor)}</span>
@@ -139,7 +151,7 @@
         ${pintarCitas(datos.citasDelDia)}
 
         <h2 class="vista__titulo" style="margin-top: 32px;">Indicadores del mes</h2>
-        ${pintarMetricas(datos.metricasDelMes)}
+        ${pintarMetricas(datos.metricasDelMes, datos.avisos)}
       </div>
     `;
 
