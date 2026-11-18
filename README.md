@@ -91,11 +91,11 @@ imagen publicada.)
 > es la colección de Postman completa corrida con Newman (51 peticiones, 77
 > aserciones, 0 fallos).
 
-> **Verificación final · 2026-11-18.** `mvn verify` en los cuatro servicios: 115
-> pruebas, 0 fallos (`docs/evidencias/pruebas-maven.txt`). La prueba de
-> concurrencia y la de separación entre negocios, que fallaban con Docker 29
-> (en local y en el CI), pasan tras subir Testcontainers a 1.21.4. Informe
-> completo: [`docs/INFORME-FINAL.md`](docs/INFORME-FINAL.md).
+**Verificación final · 2026-11-18.** `mvn verify` en los cuatro servicios: 115
+pruebas, 0 fallos (`docs/evidencias/pruebas-maven.txt`). La prueba de
+concurrencia y la de separación entre negocios, que fallaban con Docker 29
+(en local y en el CI), pasan tras subir Testcontainers a 1.21.4. Informe
+completo: [`docs/INFORME-FINAL.md`](docs/INFORME-FINAL.md).
 
 Avances anteriores:
 
