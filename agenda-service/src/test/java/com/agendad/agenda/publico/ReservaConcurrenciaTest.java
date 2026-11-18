@@ -52,6 +52,7 @@ class ReservaConcurrenciaTest {
 
     @Container
     @ServiceConnection
+    @SuppressWarnings("resource") // el ciclo de vida lo gestiona @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("agendad")
             .withUsername("agendad")
