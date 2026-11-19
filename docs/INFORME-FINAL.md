@@ -194,7 +194,7 @@ funciona y tiene evidencia; **Parcial** = funciona con alcance reducido;
 | OE1 | Separación entre negocios | Implementado | P-10 |
 | OE2 | Outbox en la misma transacción y relay a Kafka | Implementado | P-13, P-14 |
 | OE2 | Deduplicación por `eventoId` | Implementado | P-15 |
-| OE2 | Reintentos con espera creciente y DLQ | Implementado; verificado con datos reales en una sesión anterior, sin prueba automática propia ni repetición en la verificación final | P-16 |
+| OE2 | Reintentos con espera creciente y DLQ | Implementado; envío a `citas.dlq` repetido el 2026-11-19 con un mensaje malformado; sin prueba automática propia y sin medir los tiempos de espera | P-16 |
 | OE2 | Recordatorio de 24 h | Parcial: se programa y se envía el vencido; reinicio real del contenedor no medido | P-18 |
 | OE2 | Envío real por SMS, WhatsApp o correo | **Pendiente** (el aviso se guarda en la base de datos) | P-19 |
 | OE2 | Analítica de ocupación e inasistencia | Implementado (ocupación con jornada configurable) | P-27 |
