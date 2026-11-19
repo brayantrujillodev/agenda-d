@@ -7,6 +7,95 @@ Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
 
 **Repositorio:** <https://github.com/brayantrujillodev/agenda-d> · **Informe final:** [`docs/INFORME-FINAL.md`](docs/INFORME-FINAL.md)
 
+## Datos del proyecto
+
+| | |
+|---|---|
+| **Proyecto** | AGENDA-D · plataforma distribuida de agendamiento de citas |
+| **Asignatura** | Programación Avanzada · grupo SOF-G2-NOC · Equipo 2 |
+| **Repositorio** | <https://github.com/brayantrujillodev/agenda-d> (único repositorio) |
+| **Versión entregada** | Etiqueta `entrega-final-2026-11-18` (`git checkout entrega-final-2026-11-18`). El ZIP de entrega corresponde a ese mismo commit. |
+| **Release anterior** | [`v1.0.2`](../../releases/tag/v1.0.2) (imágenes en GHCR) |
+
+**Integrantes**
+
+| Integrante | Usuario de GitHub | Liderazgo |
+|---|---|---|
+| Brayan Trujillo Ramón | [brayantrujillodev](https://github.com/brayantrujillodev) | `agenda-service` (dominio, `EXCLUDE`, outbox) |
+| Andrés Bonilla | [devbonill17](https://github.com/devbonill17) | PWA de reserva |
+| Johan Camacho | [master2503](https://github.com/master2503) | `notificaciones-service` |
+| Luis Emerson Moncada Carvajal | [Emerson062002](https://github.com/Emerson062002) | `gateway-graphql` |
+
+<!-- Completar con los nombres y apellidos completos de Andrés y Johan antes de entregar. -->
+
+### Tecnologías y versiones
+
+| Capa | Tecnología | Versión |
+|---|---|---|
+| Lenguaje y plataforma | Java (Temurin) | 21 |
+| Servicios | Spring Boot | 3.3.x (3.3.5 en `agenda-service`, 3.3.13 en `gateway-graphql`) |
+| API REST y documentación | Spring Web, springdoc-openapi | 2.6.0 |
+| API GraphQL | Spring for GraphQL | la de Spring Boot 3.3 |
+| Base de datos | PostgreSQL con migraciones Flyway | 16 |
+| Mensajería | Apache Kafka en modo KRaft (imagen `bitnamilegacy/kafka`) | 3.7 |
+| Pruebas | JUnit 5, Testcontainers (Postgres y Kafka reales), Newman | Testcontainers 1.21.4 |
+| Frontend | HTML, CSS y JavaScript nativo, service worker; servido por nginx | nginx 1.27 |
+| Contenedores | Docker Compose | v2 |
+| Consolas de desarrollo | Kafka UI, pgAdmin | 0.7.2, 8 |
+| CI/CD | GitHub Actions, GHCR, GitHub Pages | — |
+
+### Arquitectura
+
+![Arquitectura implementada](docs/diagramas/arquitectura.svg)
+
+Tres servicios de negocio, un gateway GraphQL y una PWA. Lo síncrono (REST,
+GraphQL) va por petición; lo que ocurre después de reservar va por eventos en
+Kafka. Responsabilidades, comunicación, decisiones y diferencias entre lo
+aprobado y lo implementado: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+
+### Requisitos
+
+Solo **Docker con Compose v2** (probado con 29.8) y unos 5 GB de memoria libre
+para el perfil `full` (3 GB para `core`). No hace falta instalar Java, Maven,
+PostgreSQL ni Kafka. Puertos libres: 5173, 5432, 5050, 8080–8083, 8090, 29092.
+Internet solo la primera vez (descarga de imágenes).
+
+### Ejecución rápida
+
+```bash
+git clone https://github.com/brayantrujillodev/agenda-d.git
+cd agenda-d
+docker compose --profile full up -d --build     # tarda 3 a 6 minutos la primera vez
+```
+
+Cuando `docker compose --profile full ps` muestre todo `healthy`, abre la PWA en
+<http://localhost:5173/index.html> y el panel en <http://localhost:5173/panel.html>.
+Pasos detallados, puertos, uso y solución de problemas:
+[`docs/MANUAL-TECNICO.md`](docs/MANUAL-TECNICO.md). Variables de ejemplo:
+[`.env.example`](.env.example) (opcional; sin él se usan los mismos valores por defecto).
+
+### Índice de documentación
+
+| Documento | Contenido |
+|---|---|
+| [`docs/INFORME-FINAL.md`](docs/INFORME-FINAL.md) | Informe final del proyecto de aula |
+| [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Diagramas, responsabilidades y comunicación |
+| [`docs/MANUAL-TECNICO.md`](docs/MANUAL-TECNICO.md) | Instalación, ejecución, uso y problemas frecuentes |
+| [`docs/PRUEBAS.md`](docs/PRUEBAS.md) | Matriz de pruebas y resultados medidos |
+| [`docs/evidencias/`](docs/evidencias/) | Capturas, salidas de Maven, Newman y del flujo completo |
+| [`docs/openapi/`](docs/openapi/) | Contratos REST (OpenAPI) |
+| [`docs/graphql/schema.graphqls`](docs/graphql/schema.graphqls) | Contrato GraphQL |
+| [`docs/eventos/CONTRATO-EVENTOS.md`](docs/eventos/CONTRATO-EVENTOS.md) | Contrato de eventos de Kafka |
+| [`docs/postman/`](docs/postman/) | Colección de Postman |
+
+### Limitaciones
+
+Sin autenticación (fuera de alcance acordado con el docente); el aviso al
+cliente se guarda en la base de datos y **no** se envía por SMS, WhatsApp ni
+correo; no hay servidor público (la PWA de GitHub Pages reserva contra un
+`agenda-service` local); la ocupación usa una jornada configurable. Lista
+completa en [`docs/MANUAL-TECNICO.md`](docs/MANUAL-TECNICO.md) §8.
+
 ---
 
 ## Qué hace
@@ -172,7 +261,7 @@ Avances anteriores:
 ## Arranque
 
 ```bash
-git clone <url> && cd agenda-d
+git clone https://github.com/brayantrujillodev/agenda-d.git && cd agenda-d
 
 # Base de datos + bus de eventos + agenda-service
 docker compose --profile core up -d
@@ -220,7 +309,7 @@ docker exec agd-kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
 **Perfiles.** `infra` levanta base de datos, Kafka, la consola y pgAdmin. `core` añade
-`agenda-service`. `full` levanta también `notificaciones-service`,
+`agenda-service` y la PWA (nginx). `full` levanta también `notificaciones-service`,
 `gateway-graphql` y `analitica-service` — los cuatro tienen ya su `pom.xml`
 y `Dockerfile`.
 
@@ -231,6 +320,7 @@ y `Dockerfile`.
 | Consola de Kafka | <http://localhost:8090> | activo |
 | pgAdmin (ver los datos guardados) | <http://localhost:5050> · sin login, servidor AGENDA-D ya registrado | activo (`infra`, `full`) |
 | agenda-service | <http://localhost:8081> | activo |
+| PWA: reserva y panel de recepción | <http://localhost:5173/index.html> · <http://localhost:5173/panel.html> | activo (`core`, `full`) |
 | gateway GraphQL | <http://localhost:8080/graphiql> | activo |
 | analitica-service | <http://localhost:8083/v1/metricas> | activo |
 | notificaciones-service | localhost:8082 (sin UI, solo `/actuator/health`) | activo |
