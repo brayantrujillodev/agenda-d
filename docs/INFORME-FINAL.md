@@ -8,7 +8,7 @@ Plataforma distribuida de agendamiento de citas para negocios de servicios.
 | **Asignatura y grupo** | Programación Avanzada · SOF-G2-NOC · Equipo 2 |
 | **Integrantes** | Brayan Trujillo Ramón · Andrés Bonilla · Johan Camacho · Luis Emerson Moncada Carvajal |
 | **Repositorio** | <https://github.com/brayantrujillodev/agenda-d> |
-| **Versión entregada** | Etiqueta `entrega-final-2026-11-18` (mismo commit que el ZIP de entrega) |
+| **Versión entregada** | Etiqueta `entrega-final-2026-11-19` (mismo commit que el ZIP de entrega) |
 | **Periodo** | Primer commit: 2026-08-27 · cierre de este informe: 2026-11-18 |
 | **Docente** | Los datos y validaciones institucionales los completa el docente |
 

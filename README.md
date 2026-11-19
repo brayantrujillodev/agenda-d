@@ -14,7 +14,7 @@ Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2
 | **Proyecto** | AGENDA-D · plataforma distribuida de agendamiento de citas |
 | **Asignatura** | Programación Avanzada · grupo SOF-G2-NOC · Equipo 2 |
 | **Repositorio** | <https://github.com/brayantrujillodev/agenda-d> (único repositorio) |
-| **Versión entregada** | Etiqueta `entrega-final-2026-11-18` (`git checkout entrega-final-2026-11-18`). El ZIP de entrega corresponde a ese mismo commit. |
+| **Versión entregada** | Etiqueta `entrega-final-2026-11-19` (`git checkout entrega-final-2026-11-19`). El ZIP de entrega corresponde a ese mismo commit. |
 | **Release anterior** | [`v1.0.2`](../../releases/tag/v1.0.2) (imágenes en GHCR) |
 
 **Integrantes**
