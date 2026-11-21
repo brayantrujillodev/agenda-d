@@ -1,525 +1,390 @@
-# Informe final · AGENDA-D
+# Informe final del proyecto de aula · AGENDA-D
 
 Plataforma distribuida de agendamiento de citas para negocios de servicios.
-Proyecto de aula · Programación Avanzada · SOF-G2-NOC · Equipo 2.
 
 | | |
 |---|---|
+| **Nombre del proyecto** | AGENDA-D |
+| **Asignatura y grupo** | Programación Avanzada · SOF-G2-NOC · Equipo 2 |
+| **Integrantes** | Brayan Trujillo Ramón · Andrés Bonilla · Johan Camacho · Luis Emerson Moncada Carvajal |
 | **Repositorio** | <https://github.com/brayantrujillodev/agenda-d> |
-| **Release** | [`v1.0.2`](https://github.com/brayantrujillodev/agenda-d/releases/tag/v1.0.2) (imágenes en GHCR) |
-| **PWA publicada** | <https://brayantrujillodev.github.io/agenda-d/> |
-| **Equipo** | Brayan Trujillo · Andrés Bonilla · Johan Camacho · Luis Moncada |
-| **Periodo** | 2026-08-27 (primer commit) a 2026-11-18 (cierre de este informe) |
-| **Stack** | Java 21 · Spring Boot 3.3 · PostgreSQL 16 · Kafka 3.7 (KRaft) · Spring for GraphQL · Docker Compose · PWA en HTML/CSS/JS |
+| **Versión entregada** | Etiqueta `entrega-final-2026-11-19` (mismo commit que el ZIP de entrega) |
+| **Periodo** | Primer commit: 2026-08-27 · cierre de este informe: 2026-11-18 |
+| **Docente** | Los datos y validaciones institucionales los completa el docente |
 
-## 1. Resumen
+> Nombres completos de Andrés Bonilla y Johan Camacho: **pendientes de
+> completar por cada integrante** (el repositorio solo registra sus nombres de
+> usuario y un nombre corto).
 
-AGENDA-D permite que un negocio de servicios (barbería, consultorio, taller,
-veterinaria) publique un enlace o un QR. El cliente ve los cupos libres,
-reserva **sin crear cuenta** y recibe confirmación y un recordatorio 24 horas
-antes. El negocio ve su agenda del día y sus indicadores de ocupación e
-inasistencia en una sola pantalla.
+Si una información ya está en un anexo del repositorio, este informe indica su
+ubicación y no la duplica.
 
-El sistema está formado por tres servicios de negocio, un gateway GraphQL y
-una PWA, comunicados por REST y por eventos en Kafka. Las tres fases del plan
-están cerradas: contratos y cimientos, circuito mínimo de extremo a extremo y
-robustez (reintentos con DLQ, recordatorio con recuperación tras reinicio,
-analítica, panel y prueba de separación entre negocios).
+## Resumen
 
-Resultados medibles de la verificación final (sección 8):
+AGENDA-D es una plataforma distribuida para negocios de servicios (barberías,
+consultorios, talleres, veterinarias). El negocio publica un enlace; el cliente
+ve los cupos libres, reserva sin crear cuenta y recibe un aviso de confirmación
+y un recordatorio 24 horas antes; el negocio ve su agenda del día y sus
+indicadores de ocupación e inasistencia. La solución está formada por tres
+servicios de negocio en Java 21 y Spring Boot 3.3 (`agenda-service`,
+`notificaciones-service`, `analitica-service`), un gateway GraphQL, una PWA sin
+framework, PostgreSQL 16 y Kafka 3.7, todo ejecutable con Docker Compose. La
+decisión central es que **el solapamiento de citas lo impide la base de datos**
+(restricción `EXCLUDE` sobre rangos de tiempo) y no el código, y que **el
+evento de cada cita se guarda en la misma transacción** (patrón outbox) para que
+avisar al cliente nunca ponga en riesgo la reserva. En la verificación final se
+obtuvieron 116 de 116 pruebas automatizadas, 31 de 31 verificaciones de
+extremo a extremo y 51 peticiones con 77 aserciones sin fallos en Postman, y la
+prueba de 100 hilos reservando el mismo cupo dio 1 éxito y 99 conflictos. El
+envío real de avisos (SMS, WhatsApp, correo), la autenticación y un servidor
+público quedan pendientes o fuera de alcance, como se detalla en las
+secciones 7 y 10.
 
-| Indicador | Resultado |
-|---|---|
-| Verificaciones del flujo completo contra el stack real | **31 de 31** |
-| Colección de Postman corrida con Newman | **51 peticiones, 77 aserciones, 0 fallos** |
-| Pruebas automatizadas (JUnit, `mvn verify`) | **116 de 116** en los cuatro servicios |
-| Prueba de concurrencia: 100 hilos sobre el mismo cupo | 1 éxito y 99 conflictos (Testcontainers 1.21.4, Postgres real) |
-| Servicios sanos con `docker compose --profile full up -d --build` | 4 de 4 (`/actuator/health` = 200) |
-| Errores y advertencias en el log de un arranque limpio | 0 |
+## Abstract
 
-## 2. Planteamiento del problema
+AGENDA-D is a distributed appointment-scheduling platform for service
+businesses (barbershops, clinics, workshops, veterinary offices). A business
+publishes a link; customers see free slots, book without creating an account and
+receive a confirmation and a reminder 24 hours before; the business sees its
+daily agenda and occupancy and no-show indicators. The solution consists of
+three Java 21 / Spring Boot 3.3 business services, a GraphQL gateway, a
+framework-free PWA, PostgreSQL 16 and Kafka 3.7, all runnable with Docker
+Compose. Its core design decisions are that **overlapping appointments are
+prevented by the database** (an `EXCLUDE` constraint over time ranges) rather
+than by application code, and that **each appointment's event is written in the
+same transaction** (transactional outbox) so that notifying the customer can
+never endanger the booking. The final verification produced 116 of 116 automated
+tests, 31 of 31 end-to-end checks and 51 requests with 77 assertions with no
+failures in Postman; the test with 100 threads booking the same slot yielded 1
+success and 99 conflicts. Real message delivery (SMS, WhatsApp, e-mail),
+authentication and a public server remain pending or out of scope.
 
-Los negocios pequeños de servicios agendan por mensajes y llamadas. El
-problema técnico de fondo es doble: dos personas pueden pedir el mismo cupo
-al mismo tiempo, y avisar al cliente no debe hacer fallar ni retrasar la
-reserva. Una solución ingenua (validar con un `SELECT` y luego hacer el
-`INSERT`, o llamar a un servicio de notificaciones dentro de la reserva) se
-rompe justamente bajo carga o cuando un servicio está caído.
+**Keywords:** appointment scheduling, microservices, PostgreSQL exclusion
+constraint, transactional outbox, Apache Kafka, GraphQL, PWA.
 
-**Fuera de alcance por acuerdo con el docente:** autenticación de usuarios.
-El contexto de negocio llega por el `slug` de la URL (rutas públicas) o por
-la cabecera `X-Negocio-Id` (rutas administrativas).
+## 1. Problema
+
+Los negocios pequeños de servicios agendan por mensajes y llamadas. Ese
+proceso se equivoca de dos maneras: dos personas reciben el mismo horario, y el
+cliente se olvida de la cita. Técnicamente el problema tiene dos partes:
+
+1. **Concurrencia.** Dos solicitudes pueden pedir el mismo cupo al mismo tiempo.
+   Validar con una consulta antes de guardar deja una ventana en la que cabe
+   otra solicitud, y una restricción de unicidad sobre el instante de inicio no
+   detecta que una cita de 60 minutos a las 10:00 y otra a las 10:30 se pisan.
+2. **Acoplamiento.** Si avisar al cliente ocurre dentro de la reserva, un
+   servicio de mensajería lento o caído impide agendar.
+
+## 2. Justificación
+
+Reservar es lo único que el cliente espera en pantalla; confirmar, recordar y
+medir ocurren después y pueden fallar o demorarse sin afectarlo. Separar lo
+síncrono (reservar, consultar) de lo asíncrono (avisar, medir) con eventos
+permite que cada parte falle y se recupere por su cuenta. Además, el proyecto
+es el escenario de aula para aplicar contenidos de la asignatura:
+microservicios, persistencia relacional avanzada, mensajería, GraphQL,
+contenedores y pruebas con infraestructura real. La arquitectura fue aprobada
+por el docente según consta en el README; en el repositorio no hay un
+documento de aprobación, y esa validación corresponde al docente.
 
 ## 3. Objetivos
 
-### Objetivo general
-
-Construir una plataforma distribuida de agendamiento de citas en la que
-ninguna cita pueda solaparse con otra del mismo profesional y en la que las
-notificaciones y la analítica funcionen de forma asíncrona sin poner en
+**Objetivo general.** Construir una plataforma distribuida de agendamiento de
+citas en la que ninguna cita pueda solaparse con otra del mismo profesional y
+en la que los avisos y la analítica funcionen de forma asíncrona sin poner en
 riesgo la reserva.
 
-### Objetivos específicos
+**Objetivos específicos.**
 
-| # | Objetivo específico | Cómo se cumplió | Evidencia |
+1. **Integridad de la reserva.** Garantizar, en `agenda-service` y PostgreSQL,
+   que no existan citas solapadas aun bajo concurrencia, que reintentar una
+   reserva no cree otra y que cada negocio solo acceda a sus datos.
+2. **Desacople y tolerancia a fallos.** Comunicar la reserva con
+   `notificaciones-service` y `analitica-service` mediante outbox y Kafka, con
+   deduplicación, reintentos, cola de mensajes fallidos y recordatorio de 24 h.
+3. **Interfaces y verificación.** Ofrecer una PWA de reserva sin cuenta y un
+   panel de recepción servido por un gateway GraphQL, y demostrar el
+   funcionamiento con pruebas automatizadas y evidencias reproducibles.
+
+## 4. Fundamentos
+
+| Concepto | Para qué se usó | Fuente |
+|---|---|---|
+| Restricción de exclusión de PostgreSQL (`EXCLUDE USING gist`) con `tstzrange` | Impedir citas solapadas del mismo profesional; el motor arbitra la concurrencia | [1] |
+| Transactional outbox | Guardar la cita y su evento en la misma transacción y publicar después | [2] |
+| Entrega «al menos una vez» de Kafka, claves de partición, consumidores idempotentes | Orden por profesional y deduplicación por `eventoId` | [3] |
+| Idempotencia en HTTP (`Idempotency-Key`) | Reenviar una reserva devuelve la original | [4] |
+| GraphQL y patrón gateway | Componer la pantalla del panel en una consulta | [5], [6] |
+| Migraciones versionadas | Esquema reproducible, sin `ddl-auto: update` | [7] |
+| Pruebas con contenedores reales | Concurrencia y separación entre negocios contra Postgres real | [8] |
+| Aplicaciones web progresivas | Instalable, con service worker; la reserva exige conexión | [9] |
+| Almacenar instantes en UTC | Evitar errores de zona horaria; horarios locales resueltos con la zona del negocio | Decisión de diseño |
+
+## 5. Metodología realmente aplicada
+
+**Marco.** Desarrollo incremental en tres fases con un hito por fase, y una
+regla de prioridad acordada con el docente según consta en el README: primero
+el circuito completo y después la robustez.
+
+| Fase | Contenido | Resultado |
+|---|---|---|
+| 1 · Cimientos | Contratos (OpenAPI, GraphQL, eventos), migración con el `EXCLUDE`, Compose con `/actuator/health`, reserva contra la base real | Cerrada |
+| 2 · Flujo mínimo | REST → persistencia → outbox → Kafka → consumidor → GraphQL, más la PWA | Cerrada |
+| 3 · Robustez | Reintentos y DLQ, idempotencia, prueba de concurrencia, recordatorio de 24 h, analítica, panel, separación entre negocios | Cerrada |
+
+**Prácticas que sí se aplicaron** (comprobables en el repositorio):
+
+- **Contratos primero:** `docs/openapi/`, `docs/graphql/` y `docs/eventos/`
+  se acuerdan antes de programar.
+- **Rama por tarea y PR:** 31 PR fusionados en GitHub hasta el cierre.
+- **Pruebas contra infraestructura real:** Testcontainers con Postgres y
+  Kafka, y el stack completo en Docker, sin simular lo que importa.
+- **Integración continua:** GitHub Actions compila, prueba y valida el estilo
+  de Markdown, YAML, shell y SQL en cada cambio.
+- **Evidencia reproducible:** un script y una colección de Postman regeneran
+  los resultados (`docs/MANUAL-TECNICO.md` §5).
+
+**Uso de un asistente de IA.** En parte del desarrollo y en la documentación
+final se usó el asistente Claude Code. 70 de los 97 commits del historial
+llevan la línea `Co-Authored-By: Claude`, desde 2026-09-02 hasta 2026-11-18. Las
+pruebas descritas en este informe se ejecutaron realmente; cada resultado tiene
+su evidencia en `docs/evidencias/`.
+
+**Lo que no se hizo como estaba previsto.** La reunión conjunta semanal de dos
+horas figura en las reglas del equipo (README), pero el repositorio no
+guarda registro de ella, por lo que no se afirma su cumplimiento. El gateway
+GraphQL, asignado a Luis Moncada, fue completado en su versión final por otros
+integrantes (ver sección 13).
+
+## 6. Desarrollo de la solución
+
+La arquitectura, las responsabilidades de cada componente, la comunicación y
+las decisiones de diseño están en [`docs/ARQUITECTURA.md`](ARQUITECTURA.md).
+Resumen:
+
+![Arquitectura implementada](diagramas/arquitectura.svg)
+
+![Flujo de una reserva](diagramas/flujo-reserva.svg)
+
+| Componente | Puerto | Función |
+|---|---|---|
+| `agenda-service` | 8081 | Dominio, reserva, outbox. Única escritura sobre el esquema `agenda` |
+| `notificaciones-service` | 8082 | Confirmación, cancelación y recordatorio; reintentos y DLQ |
+| `analitica-service` | 8083 | Ocupación e inasistencia por día |
+| `gateway-graphql` | 8080 | `panelRecepcion` en una consulta; 5 queries, 8 mutaciones |
+| PWA (`web/`, nginx) | 5173 | Reserva pública y panel de recepción |
+| PostgreSQL 16 / Kafka 3.7 | 5432 / 29092 | Datos (3 esquemas) y eventos (4 tópicos) |
+
+Todo se levanta con `docker compose --profile full up -d --build`
+([`MANUAL-TECNICO.md`](MANUAL-TECNICO.md)). Contratos: [`openapi/`](openapi/),
+[`graphql/schema.graphqls`](graphql/schema.graphqls),
+[`eventos/CONTRATO-EVENTOS.md`](eventos/CONTRATO-EVENTOS.md).
+
+## 7. Resultados
+
+Estado de cada objetivo y de cada elemento de la solución. **Implementado** =
+funciona y tiene evidencia; **Parcial** = funciona con alcance reducido;
+**Pendiente** = no existe.
+
+| Objetivo | Elemento | Estado | Evidencia |
 |---|---|---|---|
-| 1 | Garantizar que no existan citas solapadas aun bajo concurrencia | Restricción `EXCLUDE USING gist` sobre `tstzrange(inicio, fin, '[)')` en la base de datos; el servicio intenta el `INSERT` y traduce la violación a `409` con los cupos más cercanos | Prueba de 100 hilos (1 éxito, 99 conflictos), sección 8.4 |
-| 2 | Desacoplar la reserva de las notificaciones y la analítica | Patrón outbox: la cita y el evento se escriben en la misma transacción; un relay publica en Kafka | Contrato de eventos, `OutboxRelayTest`, secciones 5 y 8 |
-| 3 | Tolerar fallos de los consumidores sin perder mensajes | Deduplicación por `eventoId`, 3 reintentos con espera creciente (1 s, 4 s, 16 s) y cola `citas.dlq` visible desde el panel | Pruebas de los consumidores y `GET /v1/mensajes-fallidos` |
-| 4 | Enviar un recordatorio 24 h antes que sobreviva a un reinicio | Recordatorio persistido como fila `PENDIENTE` y recuperado por un scheduler | `RecordatorioSchedulerTest`, migración `V3` |
-| 5 | Entregar la pantalla del negocio en una sola consulta | Gateway GraphQL con `panelRecepcion`, 5 queries y 8 mutaciones | `docs/evidencias/P3-ENTREGA-1.md` (31/31) |
-| 6 | Medir ocupación e inasistencia | `analitica-service` consume los tres tópicos y mantiene `metrica_diaria` | `GET /v1/metricas`, `MetricasConsumidorTest` |
-| 7 | Permitir reservar desde el celular sin instalar nada | PWA instalable (`manifest.json` + service worker) con reserva y panel | Carpeta `web/`, Pages publicado |
-| 8 | Aislar los datos de cada negocio | Todas las consultas del dominio filtran por `negocio_id` | `SeparacionEntreNegociosTest` (7 casos, Postgres real) |
-| 9 | Dejar el proyecto reproducible por cualquier integrante | Un comando por perfil de Docker Compose, healthchecks, migraciones Flyway, CI | Sección 7 |
-
-## 4. Metodología
-
-**Marco.** Desarrollo incremental en tres fases, con un hito explícito por
-fase y una regla de prioridad acordada con el docente: primero el circuito
-completo, después la robustez.
-
-| Fase | Contenido | Estado |
-|---|---|---|
-| 1 · Cimientos | Contratos OpenAPI/GraphQL/eventos, migración con el `EXCLUDE`, Compose con `/actuator/health`, reserva contra la BD real | Cerrada |
-| 2 · Flujo mínimo | REST → persistencia → outbox → Kafka → consumidor → GraphQL, más la PWA pública | Cerrada |
-| 3 · Robustez | DLQ y reintentos, idempotencia, Testcontainers con concurrencia, recordatorio de 24 h, analítica, panel, separación entre negocios | Cerrada |
-
-**Prácticas del equipo.**
-
-- **Contratos primero.** El OpenAPI, el esquema GraphQL y el contrato de
-  eventos se acuerdan antes de programar y no se cambian en silencio.
-- **Rama por tarea y PR revisado de forma cruzada**, para que cualquiera
-  pueda sustentar el proyecto completo. 38 PR en el repositorio.
-- **Sin mocks en lo que importa.** Las pruebas de concurrencia y de
-  separación entre negocios corren con Testcontainers contra Postgres real; la
-  evidencia de extremo a extremo corre contra el stack de Docker real.
-- **Integración semanal conjunta** de dos horas, para que los servicios que
-  se hablan por eventos se integren en una mesa y no por chat.
-- **CI en GitHub Actions:** compilación y pruebas (`build.yml`), lint de
-  Markdown, YAML, shell y SQL (`lint.yml`), publicación de la PWA
-  (`pages.yml`) y de las imágenes (`release.yml`).
-- **Probar contra la infraestructura real encontró errores que ningún mock
-  habría mostrado** (sección 9).
-
-**Reparto de liderazgo** (no de exclusividad):
-
-| Integrante | Liderazgo |
-|---|---|
-| Brayan Trujillo | `agenda-service` (dominio, `EXCLUDE`, outbox) |
-| Andrés Bonilla | PWA pública de reserva |
-| Johan Camacho | `notificaciones-service` (consumidor Kafka) |
-| Luis Moncada | `gateway-graphql` |
-
-## 5. Arquitectura
-
-```text
-                     ┌────────────────────────────┐
-  Cliente (PWA) ───► │ agenda-service :8081       │
-  REST público       │  · cupos, reserva, gestión │
-                     │  · EXCLUDE en PostgreSQL   │
-                     └─────────────┬──────────────┘
-                                   │ misma transacción
-                       agenda.cita + agenda.outbox
-                                   │ relay @Scheduled (2 s)
-                                   ▼
-        Kafka: citas.reservadas · citas.canceladas · citas.estado
-               (clave = profesionalId, 3 particiones, 7 días)
-                 │                                   │
-                 ▼                                   ▼
-   notificaciones-service :8082            analitica-service :8083
-   · confirmación / cancelación            · metrica_diaria
-   · recordatorio 24 h                     · GET /v1/metricas
-   · 3 reintentos ─► citas.dlq
-                 
-  Panel (PWA) ──► gateway-graphql :8080 ──► agenda-service + analitica-service
-                  panelRecepcion en una sola consulta
-```
-
-### 5.1 Decisiones de diseño que el equipo debe poder sustentar
-
-**El solapamiento lo impide la base de datos, no el código.**
-
-```sql
-ALTER TABLE agenda.cita ADD CONSTRAINT cita_sin_solape
-    EXCLUDE USING gist (
-        profesional_id WITH =,
-        tstzrange(inicio, fin, '[)') WITH &&
-    ) WHERE (estado <> 'CANCELADA');
-```
-
-Un `SELECT` previo al `INSERT` deja una ventana en la que cabe otra petición.
-Un `UNIQUE(profesional_id, inicio)` tampoco sirve: una cita de 60 minutos a
-las 10:00 y otra a las 10:30 tienen inicios distintos y aun así se pisan. Por
-eso se comparan **rangos** con `&&`. El servicio intenta el `INSERT`, captura
-la violación y responde `409` con los cupos más cercanos.
-
-**El evento viaja en la misma transacción que la cita (outbox).** Si la
-reserva publicara directo en Kafka, un fallo entre las dos operaciones dejaría
-una cita confirmada de la que nadie se entera. Con outbox se puede apagar
-Kafka, seguir reservando y publicar todo al reconectar.
-
-**Todo instante en UTC.** Columnas `timestamptz`; los horarios de atención se
-guardan en hora local (`TIME` + `dia_semana`) y se resuelven a UTC con
-`negocio.zona_horaria` (por defecto `America/Bogota`).
-
-**Idempotencia.** `POST /citas` exige `Idempotency-Key`; reenviarla devuelve
-la cita original. Los consumidores deduplican por `eventoId` contra
-`evento_procesado`, porque Kafka entrega al menos una vez.
-
-**Orden por profesional.** La clave de partición es siempre `profesionalId`,
-así la cancelación nunca se procesa antes que la reserva que la origina.
-
-**Mensajes de error en español y accionables**, con el formato
-`{ "codigo": "...", "mensaje": "..." }`. Nunca un stacktrace.
-
-### 5.2 Componentes
-
-| Componente | Puerto | Responsabilidad | Líneas de código (main) | Pruebas |
-|---|---|---|---|---|
-| `agenda-service` | 8081 | Dominio: servicios, profesionales, horarios, bloqueos, disponibilidad, reserva, gestión por token, outbox | 3 201 | 70 |
-| `notificaciones-service` | 8082 | Consume eventos, confirma, cancela, programa y envía el recordatorio, DLQ | 974 | 7 |
-| `analitica-service` | 8083 | Consume eventos, ocupación e inasistencia, `topServicios` | 659 | 9 |
-| `gateway-graphql` | 8080 | Compone el panel; 5 queries y 8 mutaciones; límites y errores GraphQL | 1 479 | 30 |
-| `web/` | pública | PWA de reserva y panel de recepción, instalable | 2 433 (HTML/CSS/JS) | `web/pruebas` |
-| PostgreSQL 16 | 5432 | Esquemas `agenda`, `notificaciones`, `analitica` | 3 migraciones Flyway | — |
-| Kafka 3.7 (KRaft) | 29092 | 3 tópicos de negocio y `citas.dlq` | — | — |
-
-### 5.3 Modelo de datos
-
-14 tablas en tres esquemas, creadas por Flyway (`db/V1`, `V2`, `V3`):
-
-| Esquema | Tablas |
-|---|---|
-| `agenda` | `negocio`, `servicio`, `profesional`, `servicio_profesional`, `horario_atencion`, `bloqueo`, `cita`, `token_gestion`, `outbox` |
-| `notificaciones` | `programacion`, `evento_procesado`, `mensaje_fallido` |
-| `analitica` | `metrica_diaria`, `evento_procesado` |
-
-Nunca se usa `ddl-auto: update`.
-
-### 5.4 Contratos
-
-| Contrato | Archivo | Contenido |
-|---|---|---|
-| REST | `docs/openapi/agenda-service.yaml` | 15 rutas: públicas por `slug`, administrativas por `X-Negocio-Id` |
-| GraphQL | `docs/graphql/schema.graphqls` | 5 queries, 8 mutaciones, `panelRecepcion` |
-| Eventos | `docs/eventos/CONTRATO-EVENTOS.md` | 3 tópicos más DLQ; todos con `eventoId`, `version`, `negocioId`, `correlationId` |
-
-El gateway añade límites de seguridad básica: profundidad máxima 15,
-complejidad 300, 120 peticiones por minuto por IP (429 con `Retry-After`),
-timeouts HTTP e introspección apagada en el perfil `prod`.
-
-## 6. Interfaz
-
-La PWA no usa frameworks ni paso de compilación. Tiene dos pantallas:
-
-- **Reserva pública** (`web/index.html`): servicios, cupos libres, datos del
-  cliente con validación en español y confirmación. **La reserva exige
-  conexión**: no hay cola offline, porque dos personas reservando el mismo
-  cupo sin red generarían un conflicto imposible de resolver al sincronizar.
-- **Panel de recepción** (`web/panel.html`): agenda del día, métricas del mes
-  y alerta de mensajes caídos, todo con una sola consulta GraphQL.
-
-El service worker cachea la interfaz y `manifest.json` la hace instalable.
-
-## 7. Cómo ejecutarlo
-
-Requisitos: Docker con Compose. No hace falta Java ni Maven.
-
-```bash
-git clone https://github.com/brayantrujillodev/agenda-d.git
-cd agenda-d
-
-docker compose --profile core up -d            # Postgres + Kafka + agenda-service
-docker compose --profile full up -d --build    # los cuatro servicios + consolas
-docker compose --profile full down -v          # bajar todo y empezar de cero
-```
-
-Alguien del equipo tiene 8 GB de RAM: `core` es el perfil por defecto.
-
-| Servicio | URL |
-|---|---|
-| API pública | <http://localhost:8081> |
-| Swagger | <http://localhost:8081/swagger-ui.html> |
-| GraphiQL | <http://localhost:8080/graphiql> |
-| Analítica | <http://localhost:8083/v1/metricas> |
-| Consola de Kafka | <http://localhost:8090> |
-| pgAdmin (sin login) | <http://localhost:5050> |
-| PostgreSQL | `localhost:5432` · `agendad` / `agendad` |
-
-Para regenerar la evidencia con el stack arriba:
-
-```bash
-node docs/evidencias/flujo-p3.mjs                                  # 31 verificaciones
-npx newman run docs/postman/AGENDA-D.postman_collection.json       # 51 peticiones
-```
+| OE1 | Sin solapes por restricción de la base de datos | Implementado | P-06, P-07 |
+| OE1 | Idempotencia de la reserva (`Idempotency-Key`) | Implementado | P-04 |
+| OE1 | Validación estricta de nombre, celular y cupo | Implementado | P-08, P-09, P-29 |
+| OE1 | Separación entre negocios | Implementado | P-10 |
+| OE2 | Outbox en la misma transacción y relay a Kafka | Implementado | P-13, P-14 |
+| OE2 | Deduplicación por `eventoId` | Implementado | P-15 |
+| OE2 | Reintentos con espera creciente y DLQ | Implementado; envío a `citas.dlq` repetido el 2026-11-19 con un mensaje malformado; sin prueba automática propia y sin medir los tiempos de espera | P-16 |
+| OE2 | Recordatorio de 24 h | Parcial: se programa y se envía el vencido; reinicio real del contenedor no medido | P-18 |
+| OE2 | Envío real por SMS, WhatsApp o correo | **Pendiente** (el aviso se guarda en la base de datos) | P-19 |
+| OE2 | Analítica de ocupación e inasistencia | Implementado (ocupación con jornada configurable) | P-27 |
+| OE3 | PWA de reserva sin cuenta | Implementado | P-28 |
+| OE3 | PWA instalable | Parcial: aviso de instalación observado; sin auditoría Lighthouse | P-30 |
+| OE3 | Panel de recepción y gateway GraphQL (5 queries, 8 mutaciones) | Implementado | P-20 a P-26 |
+| OE3 | Pruebas y evidencias reproducibles | Implementado | `PRUEBAS.md` |
+| General | Autenticación y roles | Fuera de alcance (acordado con el docente) | — |
+| General | Servidor público compartido | **Pendiente** (`docker-compose.prod.yml` listo, desactivado) | — |
+| General | Prueba de carga sostenida | **Pendiente** | P-34 |
 
 ## 8. Pruebas y evidencias
 
-### 8.1 Verificación final del arranque (2026-11-18)
+El detalle completo —37 casos con resultado esperado, obtenido, estado, tipo
+(medido, simulado o pendiente) y evidencia— está en
+[`docs/PRUEBAS.md`](PRUEBAS.md). Resumen de lo **medido**:
 
-Se ejecutó `docker compose --profile full down -v` seguido de
-`docker compose --profile full up -d --build` sobre una máquina Windows 11 con
-Docker 29.8. Resultado:
-
-| Contenedor | Estado |
-|---|---|
-| `agd-postgres` | healthy |
-| `agd-kafka` | healthy |
-| `agd-agenda` | healthy |
-| `agd-analitica` | healthy |
-| `agd-gateway` | healthy |
-| `agd-notificaciones` | up |
-| `agd-kafka-ui`, `agd-pgadmin` | up |
-
-`/actuator/health` respondió 200 en los puertos 8080, 8081, 8082 y 8083.
-
-### 8.2 Flujo completo contra el stack real: 31 de 31
-
-`docs/evidencias/flujo-p3.mjs` recorre el circuito completo y escribe cada
-petición con su respuesta sin editar en
-[`docs/evidencias/P3-ENTREGA-1.md`](evidencias/P3-ENTREGA-1.md). Se regeneró el
-2026-11-18 y cubre:
-
-- Reserva por REST público y confirmación consumida por notificaciones.
-- `panelRecepcion` compone agenda y métricas; el celular sale enmascarado.
-- Las 8 mutaciones: crear, actualizar y desactivar servicio; crear profesional;
-  definir horario; crear bloqueo (con `CITAS_EN_RANGO` si hay citas); cancelar
-  cita; registrar asistencia.
-- Errores de dominio en español, sin `X-Negocio-Id`, negocio inexistente, input
-  inválido e ID mal formado.
-- Con `analitica-service` caído, la agenda sale igual y `metricasDelMes` es
-  `null` con `SERVICIO_NO_DISPONIBLE` (respuesta parcial, sin datos inventados).
-- Una consulta de 19 niveles se corta antes de ejecutarse.
-- El límite de peticiones responde 429 con formato de error GraphQL.
-
-### 8.3 Colección de Postman: 51 peticiones, 77 aserciones, 0 fallos
-
-Corrida con Newman el 2026-11-18. Salida completa en
-[`docs/evidencias/newman-coleccion.txt`](evidencias/newman-coleccion.txt).
-
-| | Ejecutadas | Fallidas |
+| Prueba | Resultado | Evidencia |
 |---|---|---|
-| Peticiones | 51 | 0 |
-| Scripts de prueba | 51 | 0 |
-| Aserciones | 77 | 0 |
+| Pruebas automatizadas (`mvn verify`, Testcontainers) | 116 de 116 (70 + 7 + 9 + 30) | [`pruebas-maven.txt`](evidencias/pruebas-maven.txt) |
+| Prueba de concurrencia: 100 hilos, un mismo cupo | 1 éxito, 99 conflictos | `ReservaConcurrenciaTest` |
+| Flujo de extremo a extremo | 31 de 31 | [`P3-ENTREGA-1.md`](evidencias/P3-ENTREGA-1.md) |
+| Postman con Newman | 51 peticiones, 77 aserciones, 0 fallos | [`newman-coleccion.txt`](evidencias/newman-coleccion.txt) |
+| Arranque limpio | 8 contenedores arriba, 4 servicios `healthy` | [`estado-contenedores-y-bd.txt`](evidencias/estado-contenedores-y-bd.txt) |
+| Integración continua en `main` | `build`, `lint` y `pages` en verde | Pestaña *Actions* de GitHub |
 
-Duración total 5 s; tiempo medio de respuesta 19 ms (mínimo 5 ms, máximo 138 ms).
+**Simulado:** el aviso al cliente se registra en la base de datos
+(`RegistroCanal`), no llega a un teléfono ni a un correo. El modo
+demostración de la PWA con datos de ejemplo (`web/mock.js`) existe pero no se
+usó en esta entrega.
 
-### 8.4 Pruebas automatizadas: 116
+### Capturas (tomadas el 2026-11-18 sobre el sistema en ejecución)
 
-| Servicio | Pruebas | Qué cubren |
-|---|---|---|
-| `agenda-service` | 70 | Administración, configuración, gestión, outbox, disponibilidad, validación de reserva, reserva, validador de cupo, **concurrencia** y **separación entre negocios** |
-| `notificaciones-service` | 7 | Consumo con deduplicación, reintentos, recordatorio |
-| `analitica-service` | 9 | Consumo y proyección, controlador de métricas |
-| `gateway-graphql` | 30 | Cliente HTTP (regresión de `PATCH`), límite de peticiones, contrato GraphQL |
+**1 · El cliente elige el servicio.** La PWA lee el catálogo real.
 
-**Prueba de concurrencia** (`ReservaConcurrenciaTest`, obligatoria): 100 hilos
-reales contra un Postgres real intentan reservar el mismo cupo; el resultado
-esperado y obtenido es **1 éxito y 99 conflictos**
-por `cita_sin_solape`. **Prueba de separación entre negocios**
-(`SeparacionEntreNegociosTest`): 7 casos contra Postgres real.
+![Selección de servicio](evidencias/capturas/01-pwa-servicios.jpg)
 
-**Hallazgo del 2026-11-18: Testcontainers 1.20.4 ya no funciona con Docker 29.**
-Las dos pruebas que usan Testcontainers (concurrencia y separación entre
-negocios) fallaban con `Could not find a valid Docker environment` tanto en la
-máquina de desarrollo como en el CI de GitHub, porque Docker 29 exige una
-versión mínima de API (1.40 o superior) que el cliente de 1.20.4 no
-negocia. El código no tenía ningún defecto. Se subió Testcontainers a
-**1.21.4** en `agenda-service/pom.xml` y las pruebas pasan: concurrencia
-1/1 (1 éxito, 99 conflictos) y separación entre negocios 7/7. La corrida
-completa de `mvn verify` en los cuatro servicios está en
-[`docs/evidencias/pruebas-maven.txt`](evidencias/pruebas-maven.txt):
-70 + 7 + 9 + 30 = **116 pruebas, 0 fallos, `BUILD SUCCESS` en los cuatro**.
-
-### 8.5 Calidad de los logs
-
-En un arranque limpio no aparece ningún `ERROR` ni `WARN` real. Se encontraron
-y corrigieron dos fuentes de ruido en `docker-compose.yml`:
-
-| Origen | Síntoma | Corrección |
-|---|---|---|
-| Consumidores Kafka | `DisconnectException` impreso por `FetchSessionHandler` en cada reconexión normal | Nivel `WARN` para `FetchSessionHandler` en `notificaciones-service` y `analitica-service` |
-| `kafka-ui` | Cientos de líneas `DEBUG` del planificador de métricas | `LOGGING_LEVEL_ROOT=INFO` |
-
-Los `ERROR` que quedaban en contenedores antiguos eran historia de volúmenes
-reutilizados durante semanas (un conflicto `cita_sin_solape` de una prueba
-manual y desconexiones al suspender Docker Desktop), no fallos del sistema.
-
-### 8.6 Lint y CI
-
-`markdownlint`, `yamllint`, `shellcheck` y `sqlfluff` corren en cada push. En
-esta entrega `markdownlint` (11 archivos) y `yamllint` quedaron en 0 errores y
-0 advertencias; `.postman/` se excluye de `yamllint` por ser generado.
-
-### 8.7 Capturas de pantalla
-
-Tomadas el 2026-11-18 en un navegador real contra el stack levantado con
-`docker compose --profile full up -d --build`. Están en
-[`docs/evidencias/capturas/`](evidencias/capturas/).
-
-**1 · Reserva pública: el cliente elige el servicio.** La PWA lee el catálogo
-real de `agenda-service`.
-
-![Selección de servicio en la PWA](evidencias/capturas/01-pwa-servicios.jpg)
-
-**2 · Cupos libres del día.** Solo aparecen horas futuras; cada botón es un
-profesional con una franja libre.
+**2 · Cupos libres del día.** Solo horas futuras; cada botón es un profesional con una franja libre.
 
 ![Cupos disponibles](evidencias/capturas/02-pwa-cupos-futuros.jpg)
 
-**3 · Datos del cliente.** Sin cuenta ni contraseña: nombre y celular.
+**3 · Datos del cliente.** Sin cuenta ni contraseña.
 
-![Formulario de datos](evidencias/capturas/03-pwa-datos-cliente.jpg)
+![Datos del cliente](evidencias/capturas/03-pwa-datos-cliente.jpg)
 
-**4 · Cita confirmada.** Estado `CONFIRMADA` y enlace de gestión para
-consultar o cancelar sin iniciar sesión.
+**4 · Cita confirmada.** Estado `CONFIRMADA` y enlace para consultar o cancelar.
 
 ![Cita confirmada](evidencias/capturas/04-pwa-cita-confirmada.jpg)
 
-**5 · Panel de recepción.** La cita recién reservada aparece en la agenda del
-día y en los indicadores del mes: el circuito reserva, outbox, Kafka,
-analítica y GraphQL funcionando de extremo a extremo.
+**5 · Panel de recepción.** La cita recién reservada aparece en la agenda y en
+los indicadores: reserva, outbox, Kafka, analítica y GraphQL de extremo a extremo.
 
 ![Panel de recepción](evidencias/capturas/05-panel-recepcion.jpg)
 
-**6 · Swagger de `agenda-service`.** Documentación interactiva de la API REST.
+**6 · Swagger de `agenda-service`.**
 
 ![Swagger](evidencias/capturas/06-swagger-agenda-service.jpg)
 
-**7 · Consola de Kafka.** Los tópicos `citas.reservadas`, `citas.canceladas`,
-`citas.estado` y la cola `citas.dlq` (con 0 mensajes), con 3 particiones cada
-uno.
+**7 · Consola de Kafka.** Tópicos de negocio y `citas.dlq` sin mensajes.
 
 ![Tópicos de Kafka](evidencias/capturas/07-kafka-topicos.jpg)
 
-**8 · Defecto encontrado y corregido.** Antes del arreglo, el formulario
-rechazaba «Carlos Ramirez» por una expresión regular mal escrita (sección 9).
+**8 · Defecto detectado antes de corregirlo.** El formulario rechazaba
+«Carlos Ramirez» por una expresión regular mal escrita.
 
-![Defecto de validación del nombre](evidencias/capturas/08-defecto-validacion-nombre-antes-del-arreglo.jpg)
+![Defecto de validación](evidencias/capturas/08-defecto-validacion-nombre-antes-del-arreglo.jpg)
 
-**Estado de los contenedores y de la base de datos.** El texto completo está
-en [`docs/evidencias/estado-contenedores-y-bd.txt`](evidencias/estado-contenedores-y-bd.txt):
-8 contenedores arriba, la restricción `cita_sin_solape` tal como la guarda
-PostgreSQL, las 15 tablas de los tres esquemas y el outbox con todos sus
-eventos publicados (13 enviados, 0 pendientes).
+No hay captura de GraphiQL (su página carga scripts de `unpkg.com`, que
+respondió 503 en la prueba) ni de pgAdmin (ventana demasiado angosta); la
+evidencia equivalente está en texto, en [`P3-ENTREGA-1.md`](evidencias/P3-ENTREGA-1.md)
+y en [`estado-contenedores-y-bd.txt`](evidencias/estado-contenedores-y-bd.txt).
 
-```text
-cita_sin_solape | EXCLUDE USING gist (profesional_id WITH =,
-                  tstzrange(inicio, fin, '[)') WITH &&)
-                  WHERE ((estado <> 'CANCELADA'))
-```
+### Defectos encontrados al probar contra infraestructura real
 
-No hay captura de GraphiQL: la página que incluye Spring carga sus scripts
-desde `unpkg.com`, que durante la prueba respondió 503. La evidencia de
-GraphQL está en texto, con cada petición y respuesta, en
-[`P3-ENTREGA-1.md`](evidencias/P3-ENTREGA-1.md) y en las 51 peticiones de
-Newman. Tampoco hay captura de pgAdmin: su ventana quedó demasiado angosta
-para ser legible, y la consulta equivalente está en el archivo de texto.
-
-## 9. Errores reales encontrados al probar contra infraestructura real
-
-| Hallazgo | Cómo apareció | Corrección |
+| Defecto | Cómo apareció | Corrección |
 |---|---|---|
-| Deadlock de Postgres en vez de la violación limpia del `EXCLUDE` bajo contención extrema | Prueba de 100 hilos | Reintento acotado (hasta 8) con espera aleatoria en `ReservaService` |
-| El cálculo de «cupos más cercanos» del `409` también podía hacer deadlock | Prueba de concurrencia en CI | El `409` responde sin alternativas en ese caso, en vez de un error genérico |
-| `notificaciones.programacion.canal` era `NOT NULL`; el recordatorio es la primera fila pendiente sin canal | La primera reserva con recordatorio cayó en `citas.dlq` | Migración `V3__canal_opcional_mientras_pendiente.sql` |
-| `registrarAsistencia` fallaba siempre: `HttpURLConnection` no admite `PATCH` | Flujo completo contra Docker | Cliente HTTP del JDK, con prueba de regresión |
-| `v1.0.1` devolvía datos de ejemplo en `panelRecepcion` aunque el backend respondiera | Verificación a mano | Corregido en `v1.0.2`; el tag viejo se deja por trazabilidad |
-| El gateway inventaba datos si un servicio caía; negocio y profesional fijos en código | Auditoría de P3 | Errores GraphQL `SERVICIO_NO_DISPONIBLE`, negocio leído de `GET /v1/negocio` |
-| Dos servicios mapeaban el puerto equivocado en el Compose | Revisión del arranque | Puertos corregidos y healthchecks |
-| Testcontainers 1.20.4 incompatible con Docker 29: las 2 pruebas con contenedores fallaban en local y en el CI | `mvn verify` en el PR #37 | Subir a 1.21.4; 116/116 |
-| 130 conexiones simultáneas desde el script de evidencia provocaban `ECONNRESET` en Windows | Regeneración de evidencia | Envío en serie en `flujo-p3.mjs` |
-| El formulario de la PWA rechazaba cualquier nombre con la letra «s» (Carlos, Luis, Andrés): `replace(/s+/g, " ")` sin la barra invertida convertía cada «s» en un espacio | Captura de la PWA al reservar en el navegador (`08-defecto-validacion-nombre-antes-del-arreglo.jpg`) | `/s+/g` y `/[s-]/g` en `web/app.js` y `web/mock.js`; versión de caché del service worker subida a v6 |
-| `GET /disponibilidad` ofrecía las horas de hoy que ya habían pasado y la reserva las rechazaba con «Esa hora ya pasó» | Reserva en el navegador a las 14:00 con cupos de las 08:00 | `ValidadorCupo.esFuturo` y filtro en `DisponibilidadService`; prueba nueva (70 en `agenda-service`) |
+| Deadlock de Postgres en vez de la violación limpia del `EXCLUDE` bajo contención extrema | Prueba de 100 hilos | Reintento acotado con espera aleatoria |
+| El cálculo de «cupos más cercanos» del `409` también podía hacer deadlock | Prueba de concurrencia en CI | Responder el `409` sin alternativas en ese caso |
+| `programacion.canal` era `NOT NULL` y el recordatorio pendiente no tiene canal | La primera reserva con recordatorio cayó en `citas.dlq` | Migración `V3` |
+| `registrarAsistencia` fallaba siempre: `HttpURLConnection` no admite `PATCH` | Flujo completo contra Docker | Cliente HTTP del JDK y prueba de regresión |
+| El gateway inventaba datos si un servicio caía | Auditoría | Errores `SERVICIO_NO_DISPONIBLE`; sin datos ficticios |
+| Testcontainers 1.20.4 incompatible con Docker 29 (pruebas con contenedores fallaban en local y en CI) | `mvn verify` | Subida a 1.21.4 |
+| El formulario rechazaba cualquier nombre con la letra «s» | Reserva en el navegador | Expresión regular corregida (`\s`) |
+| La disponibilidad ofrecía horas ya pasadas | Reserva en el navegador | `ValidadorCupo.esFuturo` y prueba nueva |
 
-## 10. Resultados frente a los objetivos
+## 9. Conclusiones
 
-| Objetivo | Resultado |
-|---|---|
-| 1 · Sin solapes bajo concurrencia | Cumplido. Lo impide el motor; 100 hilos, 1 éxito |
-| 2 · Reserva desacoplada | Cumplido. Outbox en la misma transacción |
-| 3 · Tolerancia a fallos de consumidores | Cumplido. Deduplicación, reintentos y DLQ visibles |
-| 4 · Recordatorio de 24 h con recuperación | Cumplido |
-| 5 · Panel en una consulta | Cumplido. 31/31 |
-| 6 · Ocupación e inasistencia | Cumplido, con una simplificación documentada: la ocupación usa una jornada configurable en lugar de leer el horario real del otro esquema |
-| 7 · PWA instalable | Cumplido. Reserva exige conexión por diseño |
-| 8 · Aislamiento entre negocios | Cumplido. 7 casos en Postgres real |
-| 9 · Reproducibilidad | Cumplido. Un comando por perfil, verificado desde cero |
-
-## 11. Costos
-
-**Costo de infraestructura: \$0.** Todo corre localmente con Docker Compose
-(Postgres, Kafka, consolas). La publicación usa niveles gratuitos de GitHub:
-Pages para la PWA, GHCR para las imágenes, Actions para el CI. No se
-contrataron servidores ni licencias.
-
-**Costo de esfuerzo.** El equipo planificó unas 20 horas semanales entre los
-cuatro integrantes durante 15 semanas:
-
-| Concepto | Cantidad |
-|---|---|
-| Horas planificadas por semana (equipo) | 20 h |
-| Semanas del plan | 15 |
-| **Horas totales estimadas** | **300 h** |
-
-Para valorarlo en dinero se multiplican las horas por la tarifa que defina el
-equipo: `costo de esfuerzo = 300 h × tarifa por hora`. Esa tarifa no está
-registrada en el repositorio, por eso no se fija aquí un valor inventado. Un
-despliegue en servidor propio (`docker-compose.prod.yml`) queda preparado pero
-apagado; su costo mensual dependería del proveedor elegido.
-
-## 12. Limitaciones y trabajo futuro
-
-- **Sin autenticación**, por acuerdo con el docente. Cualquiera que conozca un
-  `X-Negocio-Id` actúa sobre ese negocio; para producción requeriría
-  identidad y roles.
-- **Sin backend público compartido.** La PWA en Pages reserva contra un
-  `agenda-service` local; el despliegue en servidor queda listo pero apagado.
-- **`analitica-service` sin imagen propia** en GHCR (es posterior al tag
-  `v1.0.2`).
-- **Ocupación aproximada**: usa una jornada configurable, no el horario real.
-- **GraphiQL depende de un CDN**: la página de Spring carga sus scripts desde `unpkg.com`; sin internet o con el CDN caído no abre (el endpoint `/graphql` sigue funcionando).
-- **Límite de peticiones**: el gateway admite 120 por minuto por IP; si se corren seguidas la evidencia de flujo y Newman hay que esperar un minuto entre una y otra.
-- **Canales de notificación**: hoy el aviso se registra en la base de datos (adaptador `RegistroCanal`, sin costo); un
-  canal real (SMS, WhatsApp o correo) sería el siguiente paso.
-
-## 13. Conclusiones
-
-1. **Delegar la exclusión en la base de datos fue la decisión correcta.** Una
-   restricción `EXCLUDE` sobre rangos cierra el problema de raíz y la prueba
-   de 100 hilos lo demuestra: 1 reserva y 99 conflictos limpios, sin
-   validaciones en Java que puedan quedar desfasadas.
+1. **Delegar la exclusión en la base de datos cerró el problema de raíz.** Con
+   100 hilos sobre un mismo cupo se obtuvo 1 reserva y 99 conflictos limpios,
+   sin validaciones en Java que puedan quedar desfasadas.
 2. **El outbox permite que reservar no dependa de Kafka.** La reserva responde
-   igual con el bus caído y los eventos se publican al volver, con
-   deduplicación en los consumidores para tolerar entregas repetidas.
-3. **Probar contra infraestructura real fue lo más rentable del proyecto.**
-   Los defectos más serios (deadlocks, una columna `NOT NULL`, un verbo HTTP no
-   soportado, datos inventados por el gateway) solo aparecieron con Postgres y
-   Kafka reales y carga real.
-4. **Los contratos primero evitaron integraciones a ciegas.** Con el OpenAPI,
-   el esquema GraphQL y el contrato de eventos acordados, cuatro personas
-   trabajaron en servicios distintos sin bloquearse.
-5. **Un fallo parcial se informa, no se disfraza.** Si un servicio cae, el
-   gateway devuelve un error en español en ese campo y deja pasar el resto, en
-   lugar de inventar datos.
-6. **Se cumplió el alcance acordado con el docente:** circuito completo
-   primero y robustez después, con las tres fases cerradas y la arquitectura
-   reproducible desde cero con un solo comando.
+   igual con el bus caído; los eventos se publican al volver y los consumidores
+   toleran entregas repetidas.
+3. **Probar contra infraestructura real fue lo más rentable.** Los defectos más
+   serios (deadlocks, una columna `NOT NULL`, un verbo HTTP no soportado, datos
+   inventados) solo aparecieron con Postgres y Kafka reales.
+4. **Los contratos primero evitaron integraciones a ciegas** entre cuatro
+   personas trabajando en servicios distintos.
+5. **Un fallo parcial se informa, no se disfraza:** si un servicio cae, el
+   gateway devuelve un error en español en ese campo y deja pasar el resto.
+6. **Se cumplieron los tres objetivos específicos** dentro del alcance acordado,
+   con tres excepciones declaradas: envío real de avisos, servidor público y
+   prueba de carga.
 
-## 14. Anexos
+## 10. Limitaciones
 
-| Documento | Ruta |
+- **Sin autenticación** (acordado con el docente): quien conozca un
+  `X-Negocio-Id` actúa sobre ese negocio.
+- **Sin envío real de mensajes**; el aviso se registra en la base de datos.
+- **Sin servidor público:** la PWA publicada en GitHub Pages reserva contra un
+  `agenda-service` local.
+- **Ocupación aproximada:** usa una jornada configurable, no el horario real.
+- **`analitica-service` sin imagen propia** en GHCR (posterior al release `v1.0.2`).
+- **GraphiQL depende de un CDN externo** (`unpkg.com`).
+- **Límite del gateway:** 120 peticiones por minuto por IP; correr seguidos el
+  script de evidencia y Newman exige esperar un minuto.
+- **Sin prueba de carga sostenida** ni auditoría de accesibilidad o de
+  instalabilidad (Lighthouse).
+
+## 11. Referencias
+
+[1] The PostgreSQL Global Development Group. *PostgreSQL 16 Documentation:
+Exclusion Constraints.* <https://www.postgresql.org/docs/16/ddl-constraints.html#DDL-CONSTRAINTS-EXCLUSION>
+
+[2] Richardson, C. *Pattern: Transactional outbox.* microservices.io.
+<https://microservices.io/patterns/data/transactional-outbox.html>; y
+Richardson, C. (2018). *Microservices Patterns.* Manning.
+
+[3] Apache Software Foundation. *Apache Kafka Documentation.*
+<https://kafka.apache.org/documentation/>
+
+[4] IETF HTTPAPI Working Group. *The Idempotency-Key HTTP Header Field*
+(borrador). <https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/>
+
+[5] GraphQL Foundation. *GraphQL Specification.* <https://spec.graphql.org/>
+
+[6] VMware / Spring. *Spring for GraphQL Reference.*
+<https://docs.spring.io/spring-graphql/reference/>
+
+[7] Redgate. *Flyway Documentation.* <https://documentation.red-gate.com/flyway>
+
+[8] Testcontainers. *Testcontainers for Java.* <https://java.testcontainers.org/>
+
+[9] Mozilla. *Progressive web apps.* MDN Web Docs.
+<https://developer.mozilla.org/docs/Web/Progressive_web_apps>
+
+## 12. Recursos y presupuesto
+
+Se distingue lo **real** (se gastó o se usó y consta) de lo **estimado**.
+
+| Concepto | Real | Estimado |
+|---|---|---|
+| Infraestructura (servidores, licencias, dominios) | **\$0.** Todo corrió en los equipos del equipo con Docker; la publicación usó los niveles gratuitos de GitHub (Pages, GHCR, Actions) | — |
+| Software | Código abierto: Java, Spring, PostgreSQL, Kafka, nginx, Docker. El asistente de IA Claude Code se usó como herramienta; el repositorio no registra su costo | — |
+| Horas de trabajo | **No se registraron.** | 20 h por semana entre los cuatro durante 15 semanas = **300 h** (capacidad planeada, según el README) |
+| Valoración en dinero del esfuerzo | No calculada | `300 h × tarifa por hora`. La tarifa no consta en el repositorio; la define el equipo o el docente |
+| Despliegue en servidor | No realizado | Su costo mensual dependería del proveedor; `docker-compose.prod.yml` queda preparado |
+
+## 13. Aporte individual
+
+Evidencia objetiva tomada del historial de GitHub al 2026-11-18. La columna
+«Aporte declarado» la completa cada integrante; este informe no la inventa.
+
+| Integrante | Responsabilidad asignada | Commits en el historial | PR propios fusionados | Aporte declarado por el integrante |
+|---|---|---|---|---|
+| Brayan Trujillo Ramón | `agenda-service`: dominio, `EXCLUDE`, outbox | 62 (usuarios `trujilloramonbrayan-create` y «Brayan Trujillo Ramón») | 23 | *(por completar)* |
+| Andrés Bonilla | PWA pública de reserva | 14 | 4 (más 1 abierto) | *(por completar)* |
+| Johan Camacho | `notificaciones-service` | 3 (usuario `jhoancamachoar-commits`, por confirmar) | 1 (usuario `master2503`; 1 más cerrado sin fusionar) | *(por completar)* |
+| Luis Emerson Moncada Carvajal | `gateway-graphql` | 1 | 1 | *(por completar)* |
+
+Observaciones: según el historial, la versión final del gateway GraphQL, de
+`analitica-service`, de la prueba de concurrencia y del panel de recepción se
+registró en gran parte con la cuenta de Brayan Trujillo, con apoyo del asistente
+de IA. Un integrante puede tener más de un usuario de Git, y la asignación de
+los usuarios `jhoancamachoar-commits` y `master2503` a Johan Camacho se hizo por
+el nombre del usuario: **cada integrante debe confirmar sus datos**. Los
+conteos son orientativos.
+
+## Anexos
+
+| Anexo | Ubicación |
 |---|---|
-| README del proyecto | [`README.md`](../README.md) |
-| Contrato REST | [`docs/openapi/agenda-service.yaml`](openapi/agenda-service.yaml) |
-| Contrato GraphQL | [`docs/graphql/schema.graphqls`](graphql/schema.graphqls) |
-| Contrato de eventos | [`docs/eventos/CONTRATO-EVENTOS.md`](eventos/CONTRATO-EVENTOS.md) |
-| Evidencia del flujo (31/31) | [`docs/evidencias/P3-ENTREGA-1.md`](evidencias/P3-ENTREGA-1.md) |
-| Salida de Newman | [`docs/evidencias/newman-coleccion.txt`](evidencias/newman-coleccion.txt) |
-| Colección de Postman | [`docs/postman/AGENDA-D.postman_collection.json`](postman/AGENDA-D.postman_collection.json) |
-| Pasos del flujo mínimo | [`docs/CONSTRUCCION.md`](CONSTRUCCION.md) |
-| Backlog | [`docs/TAREAS.md`](TAREAS.md) |
-| Guion de sustentación | [`docs/GUION-SUSTENTACION.md`](GUION-SUSTENTACION.md) |
-| Equipo | [`docs/EQUIPO.md`](EQUIPO.md) |
+| A. Arquitectura, diagramas y responsabilidades | [`docs/ARQUITECTURA.md`](ARQUITECTURA.md), [`docs/diagramas/`](diagramas/) |
+| B. Manual técnico: instalación, ejecución y uso | [`docs/MANUAL-TECNICO.md`](MANUAL-TECNICO.md) |
+| C. Matriz de pruebas (37 casos) | [`docs/PRUEBAS.md`](PRUEBAS.md) |
+| D. Evidencias: capturas, Maven, Newman, flujo, estado de la base | [`docs/evidencias/`](evidencias/) |
+| E. Contrato REST (OpenAPI) | [`docs/openapi/`](openapi/) |
+| F. Contrato GraphQL | [`docs/graphql/schema.graphqls`](graphql/schema.graphqls) |
+| G. Contrato de eventos de Kafka | [`docs/eventos/CONTRATO-EVENTOS.md`](eventos/CONTRATO-EVENTOS.md) |
+| H. Colección de Postman | [`docs/postman/AGENDA-D.postman_collection.json`](postman/AGENDA-D.postman_collection.json) |
+| I. Migraciones y datos ficticios | [`db/`](../db/) |
+| J. Variables de ejemplo | [`.env.example`](../.env.example) |
+| K. Backlog y guion de sustentación | [`docs/TAREAS.md`](TAREAS.md), [`docs/GUION-SUSTENTACION.md`](GUION-SUSTENTACION.md) |

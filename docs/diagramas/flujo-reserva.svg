@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="Segoe UI, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#37474f"/>
+    </marker>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#b71c1c"/>
+    </marker>
+  </defs>
+  <rect width="960" height="520" fill="#ffffff"/>
+  <text x="480" y="26" text-anchor="middle" font-size="17" font-weight="bold" fill="#1b2a2f">Flujo de una reserva: de la PWA al panel</text>
+
+  <!-- cabeceras de columnas -->
+  <g font-weight="bold" text-anchor="middle">
+    <rect x="20" y="44" width="130" height="30" rx="5" fill="#e8f5e9" stroke="#2e7d32"/><text x="85" y="64">PWA</text>
+    <rect x="200" y="44" width="150" height="30" rx="5" fill="#fff8e1" stroke="#f9a825"/><text x="275" y="64">agenda-service</text>
+    <rect x="400" y="44" width="130" height="30" rx="5" fill="#eceff1" stroke="#455a64"/><text x="465" y="64">PostgreSQL</text>
+    <rect x="580" y="44" width="100" height="30" rx="5" fill="#fff3e0" stroke="#e65100"/><text x="630" y="64">Kafka</text>
+    <rect x="720" y="44" width="220" height="30" rx="5" fill="#f3e5f5" stroke="#6a1b9a"/><text x="830" y="64">notificaciones / analítica</text>
+  </g>
+  <g stroke="#b0bec5" stroke-dasharray="4 4">
+    <line x1="85" y1="74" x2="85" y2="500"/><line x1="275" y1="74" x2="275" y2="500"/>
+    <line x1="465" y1="74" x2="465" y2="500"/><line x1="630" y1="74" x2="630" y2="500"/>
+    <line x1="830" y1="74" x2="830" y2="500"/>
+  </g>
+
+  <g stroke="#37474f" stroke-width="1.6" fill="none">
+    <line x1="85" y1="105" x2="275" y2="105" marker-end="url(#a)"/>
+    <line x1="275" y1="145" x2="465" y2="145" marker-end="url(#a)"/>
+    <line x1="275" y1="185" x2="465" y2="185" marker-end="url(#a)"/>
+    <line x1="465" y1="225" x2="275" y2="225" marker-end="url(#a)"/>
+    <line x1="275" y1="260" x2="85" y2="260" marker-end="url(#a)"/>
+    <line x1="275" y1="320" x2="465" y2="320" marker-end="url(#a)"/>
+    <line x1="275" y1="360" x2="630" y2="360" marker-end="url(#a)"/>
+    <line x1="630" y1="400" x2="830" y2="400" marker-end="url(#a)"/>
+    <line x1="830" y1="440" x2="465" y2="440" marker-end="url(#a)"/>
+  </g>
+  <line x1="465" y1="285" x2="275" y2="285" stroke="#b71c1c" stroke-width="1.6" stroke-dasharray="6 3" marker-end="url(#d)"/>
+
+  <g font-size="12">
+    <text x="180" y="97" text-anchor="middle">1 POST /citas + Idempotency-Key</text>
+    <text x="370" y="137" text-anchor="middle">2 INSERT agenda.cita</text>
+    <text x="370" y="177" text-anchor="middle">3 INSERT agenda.outbox</text>
+    <text x="370" y="217" text-anchor="middle">4 COMMIT (las dos filas, o ninguna)</text>
+    <text x="180" y="252" text-anchor="middle">5 201 CONFIRMADA</text>
+    <text x="370" y="278" text-anchor="middle" fill="#b71c1c">si el EXCLUDE rechaza → 23P01</text>
+    <text x="180" y="278" text-anchor="middle" fill="#b71c1c">409 + cupos cercanos</text>
+    <text x="370" y="312" text-anchor="middle">6 relay @Scheduled lee outbox</text>
+    <text x="450" y="352" text-anchor="middle">7 publica (clave = profesionalId) y marca enviado_en</text>
+    <text x="730" y="392" text-anchor="middle">8 consumen</text>
+    <text x="650" y="432" text-anchor="middle">9 dedup por eventoId, guardan mensaje y métrica</text>
+  </g>
+  <text x="480" y="505" text-anchor="middle" font-size="11" fill="#555">El panel (gateway GraphQL) lee después la cita desde agenda-service y las métricas desde analitica-service.</text>
+</svg>

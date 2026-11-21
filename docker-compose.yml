@@ -27,9 +27,9 @@ services:
     container_name: agd-postgres
     profiles: [infra, core, full]
     environment:
-      POSTGRES_DB: agendad
-      POSTGRES_USER: agendad
-      POSTGRES_PASSWORD: agendad
+      POSTGRES_DB: ${DB_NAME:-agendad}
+      POSTGRES_USER: ${DB_USER:-agendad}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-agendad}
     ports:
       - "5432:5432"          # para conectar DBeaver o psql desde el equipo
     volumes:
@@ -38,7 +38,7 @@ services:
       # Cuando exista agenda-service, Flyway toma el relevo.
       - ./db:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agendad -d agendad"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-agendad} -d ${DB_NAME:-agendad}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -130,8 +130,8 @@ services:
     container_name: agd-pgadmin
     profiles: [infra, full]
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@agendad.com
-      PGADMIN_DEFAULT_PASSWORD: agendad
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@agendad.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-agendad}
       PGADMIN_CONFIG_SERVER_MODE: "False"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     # libpq ignora un pgpass con permisos abiertos, y un archivo montado
@@ -139,7 +139,10 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - echo 'postgres:5432:*:agendad:agendad' > /tmp/pgpass && chmod 600 /tmp/pgpass && exec /entrypoint.sh
+      - >-
+        echo 'postgres:5432:*:${DB_USER:-agendad}:${DB_PASSWORD:-agendad}' > /tmp/pgpass
+        && chmod 600 /tmp/pgpass
+        && exec /entrypoint.sh
     volumes:
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
     ports:
@@ -161,9 +164,9 @@ services:
     container_name: agd-agenda
     profiles: [core, full]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
-      SPRING_DATASOURCE_USERNAME: agendad
-      SPRING_DATASOURCE_PASSWORD: agendad
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-agendad}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-agendad}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-agendad}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
       LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
@@ -188,9 +191,9 @@ services:
     container_name: agd-notificaciones
     profiles: [full]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
-      SPRING_DATASOURCE_USERNAME: agendad
-      SPRING_DATASOURCE_PASSWORD: agendad
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-agendad}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-agendad}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-agendad}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
       LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
@@ -236,9 +239,9 @@ services:
     container_name: agd-analitica
     profiles: [full]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/agendad
-      SPRING_DATASOURCE_USERNAME: agendad
-      SPRING_DATASOURCE_PASSWORD: agendad
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-agendad}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-agendad}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-agendad}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # Los DisconnectException de fetch son reconexiones normales de Kafka; solo ruido
       LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_FETCHSESSIONHANDLER: WARN
@@ -256,6 +259,25 @@ services:
       retries: 10
       start_period: 40s
     mem_limit: 512m
+    networks: [agenda-net]
+
+  # PWA (reserva pública y panel de recepción). Archivos estáticos servidos
+  # por nginx: sin build. El navegador llama a agenda-service (8081) y al
+  # gateway (8080) desde la máquina del usuario, por eso usa localhost.
+  web:
+    image: nginx:1.27-alpine
+    container_name: agd-web
+    profiles: [core, full]
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+    ports:
+      - "5173:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/index.html"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 32m
     networks: [agenda-net]
 
 volumes:
