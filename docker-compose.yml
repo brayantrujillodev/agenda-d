@@ -139,7 +139,10 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - echo 'postgres:5432:*:${DB_USER:-agendad}:${DB_PASSWORD:-agendad}' > /tmp/pgpass && chmod 600 /tmp/pgpass && exec /entrypoint.sh
+      - >-
+        echo 'postgres:5432:*:${DB_USER:-agendad}:${DB_PASSWORD:-agendad}' > /tmp/pgpass
+        && chmod 600 /tmp/pgpass
+        && exec /entrypoint.sh
     volumes:
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
     ports:
